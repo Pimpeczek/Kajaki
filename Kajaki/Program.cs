@@ -95,6 +95,7 @@ namespace Kajaki
 
             return options[hPoint].Item2;
         }
+
         
 
         public void Draw()
