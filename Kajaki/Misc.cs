@@ -257,6 +257,8 @@ namespace Kajaki
         public static readonly Char[] roundBoxChars =       { '╮', ' ', '─', '╭', '┬', ' ', '╯', '│', '┤', '╰', '┴', '├', '┼' };
         public static readonly Char[] dashedLightBoxChars = { '┐', ' ', '┄', '┌', '┬', ' ', '┘', '┊', '┤', '└', '┴', '├', '┼' };
         public static readonly Char[] dashedBoxChars =      { '┓', ' ', '┅', '┏', '┳', ' ', '┛', '┋', '┫', '┗', '┻', '┣', '╋' };
+
+
         public static Char GetBoxChar(int id)
         {
             id -= 3;
@@ -286,10 +288,28 @@ namespace Kajaki
             return dashedBoxChars[id];
         }
 
-        public static void DrawBox(BoxType boxType, int x, int y, int sx, int sy)
+
+        /*
+        protected char GetBorderChar(Int2 pos, char[] boxes)
+        {
+            int id = 0;
+            if (pos.x > 0 && borderMap[pos.x - 1, pos.y])
+                id += 1;
+            if (pos.y < Size.y - 1 && borderMap[pos.x, pos.y + 1])
+                id += 2;
+            if (pos.x < Size.x - 1 && borderMap[pos.x + 1, pos.y])
+                id += 4;
+            if (pos.y > 0 && borderMap[pos.x, pos.y - 1])
+                id += 8;
+            id -= 3;
+            return boxes[id];
+        }
+        */
+
+        public static Char[] GetBoxArray(BoxType boxType)
         {
             Char[] bs;
-            switch(boxType)
+            switch (boxType)
             {
                 case BoxType.dashed:
                     bs = dashedBoxChars;
@@ -310,6 +330,16 @@ namespace Kajaki
                     bs = boxChars;
                     break;
             }
+            return bs;
+        }
+
+        public static void DrawBox(BoxType boxType, int x, int y, int sx, int sy)
+        {
+            DrawBox(GetBoxArray(boxType), x, y, sx, sy);
+        }
+
+        public static void DrawBox(Char[] bs, int x, int y, int sx, int sy)
+        {
             Console.SetCursorPosition(x, y);
             Console.Write($"{bs[3]}{"".PadLeft(sx - 2, bs[2])}{bs[0]}");
             string midBorder = $"{bs[7]}{"".PadLeft(sx - 2)}{bs[7]}";
@@ -317,9 +347,21 @@ namespace Kajaki
             {
                 Console.SetCursorPosition(x, y + i);
                 Console.Write(midBorder);
+
             }
             Console.SetCursorPosition(x, y + sy - 1);
             Console.Write($"{bs[9]}{"".PadLeft(sx - 2, bs[2])}{bs[6]}");
+            
+        }
+
+        public static string GetBoxName(string name, BoxType boxType)
+        {
+            return GetBoxName(name, GetBoxArray(boxType));
+        }
+
+        public static string GetBoxName(string name, Char[] boxes)
+        {
+            return $"{boxes[8]}{name}{boxes[11]}";
         }
     }
 

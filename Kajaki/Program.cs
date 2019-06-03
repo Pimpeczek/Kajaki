@@ -10,130 +10,87 @@ namespace Kajaki
 {
     class Program
     {
-        static bool clearOnExit;
-        static bool redrawBoxes;
         static void Main(string[] args)
         {
-            clearOnExit = true;
-            Console.SetWindowSize(40, 20);
-            Menu mainMenu = new Menu(new Int2(0,0), new Int2(40, 4), "Main menu", Boxes.BoxType.doubled);
+            Console.SetWindowSize(50, 20);
+            Console.CursorVisible = false;
+            Menu mainMenu = new Menu(new Int2(0,0), new Int2(40, 10), "Main menu", Boxes.BoxType.doubled);
+            mainMenu.HorizontalAlignment = Renderer.HorizontalTextAlignment.middle;
+            mainMenu.VerticallAlignment = Renderer.VerticalTextAlignment.middle;
             mainMenu.AddOption("Host a game", 0);
             mainMenu.AddOption("Join a game", 1);
             mainMenu.AddOption("Ship designer", 2);
-            mainMenu.AddOption("Exit", -1);
+            mainMenu.AddOption("Exit the game", -1);
+            //mainMenu.BottomText = "[Enter - confirm]";
+            
             int response;
+            int all = 0;
+            int all2 = 0;
             do
             {
                 response = mainMenu.WaitForInput();
+
+                if(response == 0)
+                {
+                    mainMenu.Erase();
+                    SetupBoard();
+                }
+
             } while (response != -1);
 
         }
 
-    }
-    class Renderer
-    {
-        public void Write(string text, Int2 position)
-        {
-            Write(text, position.x, position.y);
-        }
-        public void Write(string text, int x, int y)
+        static void SetupBoard()
         {
 
-        }
-    }
 
-    class Menu
-    {
-        public Int2 Position { get; protected set; }
-        public Int2 Size { get; protected set; }
-        public string Name { get; protected set; }
-        Boxes.BoxType boxType;
-        List<(string, int)> options;
-        int hPoint;
-        int scrollPoint;
-        public Menu(Int2 position, Int2 size, string name, Boxes.BoxType boxType)
-        {
-            options = new List<(string, int)>();
-            hPoint = 0;
-            scrollPoint = 0;
-            Position = position;
-            Size = size;
-            Name = name;
-            this.boxType = boxType;
-        }
 
-        public void AddOption(string text, int id)
-        {
-            options.Add((text, id));
-        }
 
-        public int WaitForInput()
-        {
-            ConsoleKey response;
-            Draw();
-            DrawOptions();
-            do
-            {
-                response = Console.ReadKey(true).Key;
-                switch (response)
-                {
-                    case ConsoleKey.UpArrow:
-                        hPoint--;
-                        break;
-                    case ConsoleKey.DownArrow:
-                        hPoint++;
-                        break;
-                }
-                if( hPoint < 0)
-                    hPoint += (options != null && options.Count > 0 ? options.Count : 1);
-                hPoint %= (options != null && options.Count > 0 ? options.Count : 1);
-                
-                
-                DrawOptions();
+            Map map = new Map(new Int2(20, 20));
+            map.Draw();
 
-            } while (response != ConsoleKey.Enter);
-
-            return options[hPoint].Item2;
+            Console.ReadKey(true);
         }
 
         
-
-        public void Draw()
-        {
-            Console.ForegroundColor = ConsoleColor.White;
-            Boxes.DrawBox(boxType, Position.x, Position.y, Size.x, Size.y);
-            Console.SetCursorPosition(Position.x + (Size.x - Name.Length) / 2, Position.y);
-            Console.Write(Name);
-            
-        }
-
-
-        void DrawOptions()
-        {
-            int startHeight = Arit.Clamp((Size.y - 2 - options.Count) / 2, 0, Size.y);
-            if(hPoint >= Size.y - 2)
-            {
-                scrollPoint = Arit.Clamp(Size.y - 2 - hPoint, 0, options.Count - Size.y + 2);
-            }
-            Console.SetCursorPosition(45, 0);
-            Console.Write(scrollPoint);
-            Console.SetCursorPosition(45, 1);
-            Console.Write(hPoint);
-            for (int i = 0; i < options.Count && i < Size.y - 2; i++)
-            {
-                Console.SetCursorPosition(Position.x + (Size.x - options[i + scrollPoint].Item1.Length) / 2, Position.y + startHeight + i - scrollPoint+ 1);
-                if (hPoint - scrollPoint == i)
-                {
-                    Console.Write(options[i + scrollPoint].Item1.PastelBg(Color.Gray));
-                }
-                else
-                {
-                    Console.Write(options[i + scrollPoint].Item1);
-                }
-
-            }
-        }
+    
     }
+
+
+
+    class Renderer
+    {
+        public enum HorizontalTextAlignment { left, middle, right }
+        public enum VerticalTextAlignment { upper, middle, lower }
+        public static void Write(string text, Int2 position)
+        {
+            Write(text, position.x, position.y);
+        }
+        public static void Write(string text, int x, int y)
+        {
+            Console.SetCursorPosition(x, y);
+            Console.Write(text);
+        }
+        public static void Write(int text, Int2 position)
+        {
+            Write(text, position.x, position.y);
+        }
+        public static void Write(int text, int x, int y)
+        {
+            Console.SetCursorPosition(x, y);
+            Console.Write(text);
+        }
+
+        public static bool IsBorder(Int2 pos, Int2 size)
+        {
+            return !(pos.x > 0 && pos.x < size.x - 1 && pos.y > 0 && pos.y < size.y - 1);
+        }
+
+
+    }
+
+
+    
 
 
     class Map
@@ -151,42 +108,31 @@ namespace Kajaki
         int frame;
 
 
-        public Map(Int2 size, List<Ship> ships)
+        public Map(Int2 size)
         {
-            this.ships = ships;
+            ships = new List<Ship>();
             Position = new Int2(2, 2);
             contentPosition = new Int2(Position.x + 1, Position.y + 1);
-            contentSize = new Int2(size.x - 2, size.y - 2);
-            Size = size;
+            contentSize = size;
+            Size = new Int2(size.x + 2, size.y + 2);
             frame = 0;
 
-            waterLane = Misc.GetFilledString(size.x - 2, Bars.transparent[1]);
-            upBorder = $"█{Misc.GetFilledString(size.x - 2, '█')}█";
+            waterLane = Misc.GetFilledString(Size.x - 2, Bars.transparent[1]);
+            upBorder = $"█{Misc.GetFilledString(Size.x - 2, '█')}█";
             midBorder = $"█{waterLane}█";
-            downBorder = $"█{Misc.GetFilledString(size.x - 2, '█')}█";
+            downBorder = $"█{Misc.GetFilledString(Size.x - 2, '█')}█";
         }
 
 
         public void Draw()
         {
             DrawMapRaw();
-            Ship tShip;
-            string shipLine;
+
             for(int i = 0; i < ships.Count; i++)
             {
-                tShip = ships[i];
-                if (tShip.Changed)
+                for(int j = 0; i < ships[i].decks.Length; j++)
                 {
-                    for (int y = 0; y < tShip.Size.y; y++)
-                    {
-                        shipLine = "";
-                        for (int x = 0; x < tShip.Size.x; x++)
-                        {
-                            shipLine += (tShip.Decks[x, y] == null ? waterLane[x] : tShip.Decks[x, y].symbol);
-                        }
-                        Console.SetCursorPosition(contentPosition.x + tShip.Position.x, contentPosition.y + tShip.Position.y + y);
-                        Console.Write(shipLine);
-                    }
+                    Renderer.Write("█", ships[i].decks[j].position);
                 }
             }
         }
@@ -209,97 +155,43 @@ namespace Kajaki
 
     class Deck
     {
-        public char symbol;
-        public Deck(char symbol)
+        public Int2 position;
+        public Ship ship;
+        public Ship.ShipState deckState;
+
+        public void Hit()
         {
-            this.symbol = symbol;
+            deckState = Ship.ShipState.hit;
+            ship.Hit();
         }
+
+        public void Sunk()
+        {
+            deckState = Ship.ShipState.sunk;
+        }
+
     }
 
     class Ship
     {
-        public Int2 Position { get; protected set; }
-        public Int2 Size { get; protected set; }
-        public Deck[,] Decks { get; protected set; }
-        public bool Changed { get; protected set; }
-        Deck[,] oryginalDecks;
-        Int2 oryginalSize;
-        int dir; // 0 = right 1 = down ...
-        public Ship(Int2 position, Deck[,] decks)
-        {
-            Random rng = new Random();
-            Position = position;
-            Changed = true;
-            decks = new Deck[5, 8];
-            for (int i = 0; i < 5; i++)
-                for (int j = 0; j < 8; j++)
-                {
-                    if (rng.Next(2) == 0)
-                        decks[i, j] = new Deck('#');
-                }
-            oryginalSize = new Int2(decks.GetLength(0), decks.GetLength(1));
-            Size = oryginalSize;
-            oryginalDecks = decks;
-            this.Decks = decks;
-            dir = 0;
-        }
+        public enum ShipState {fine, hit, sunk};
+        public int id;
+        public Deck[] decks;
+        public ShipState shipState;
+        public int hits;
 
-        public bool Rotate(int right)
+        public void Hit()
         {
-            dir += right;
-            dir %= 4;
-            return true;
-        }
-
-        public bool RotateRight()
-        {
-            oryginalDecks = Decks;
-            oryginalSize = Size;
-            Decks = new Deck[Size.y, Size.x];
-            for (int x = 0; x < Size.x; x++)
+            hits++;
+            if(hits == decks.Length)
             {
-                for (int y = 0; y < Size.y; y++)
+                for(int i = 0; i < decks.Length; i++)
                 {
-                    Decks[Size.y - y - 1, x] = oryginalDecks[x, y];
+                    decks[i].Sunk();
                 }
             }
-            Size = new Int2(oryginalSize.y, oryginalSize.x);
-            return true;
+            shipState = ShipState.sunk;
         }
-
-        public bool RotateLeft()
-        {
-            oryginalDecks = Decks;
-
-            Decks = new Deck[Size.y, Size.x];
-
-            for (int x = 0; x < Size.x; x++)
-            {
-                for (int y = 0; y < Size.y; y++)
-                {
-                    Decks[y, Size.x - x - 1] = oryginalDecks[x, y];
-                }
-            }
-            Size = new Int2(oryginalSize.y, oryginalSize.x);
-            return true;
-        }
-
-        public void Draw()
-        {
-            string line;
-            for (int y = 0; y < Size.y; y++)
-            {
-                line = "";
-                for (int x = 0; x < Size.x; x++)
-                {
-                    line += (Decks[x, y] == null ? ' ' : '#');
-                }
-                Console.SetCursorPosition(2, 2 + y);
-                Console.Write(line);
-            }
-
-        }
-
     }
 
 
