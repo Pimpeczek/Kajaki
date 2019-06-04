@@ -10,11 +10,16 @@ namespace Kajaki
 {
     class Program
     {
+        static Int2 windowSize;
+        static Map prepareMap;
         static void Main(string[] args)
         {
-            Console.SetWindowSize(50, 20);
+            windowSize = new Int2(200, 50);
+            Console.SetWindowSize(200, 50);
+
             Console.CursorVisible = false;
-            Menu mainMenu = new Menu(new Int2(0,0), new Int2(40, 10), "Main menu", Boxes.BoxType.doubled);
+            Int2 menuSize = new Int2(40, 10);
+            Menu mainMenu = new Menu(new Int2((windowSize.x - menuSize.x) /2, (windowSize.y - menuSize.y) / 2), menuSize, "Main menu", Boxes.BoxType.doubled);
             mainMenu.HorizontalAlignment = Renderer.HorizontalTextAlignment.middle;
             mainMenu.VerticallAlignment = Renderer.VerticalTextAlignment.middle;
             mainMenu.AddOption("Host a game", 0);
@@ -43,13 +48,31 @@ namespace Kajaki
         static void SetupBoard()
         {
 
+            Switcher switcher = new Switcher(new Int2(1, 1), new Int2(30, 15), "Board Options", Boxes.BoxType.doubled);
+            switcher.AddOption(new IntSwitcherOption("Board width", "width", 10, 10, 50, 1));
+            switcher.AddOption(new IntSwitcherOption("Board height", "height", 10, 10, 40, 1));
+            switcher.AddChangeAction(MapSwitcherChanged);
 
+            
 
-
-            Map map = new Map(new Int2(20, 20));
-            map.Draw();
+            prepareMap = new Map(new Int2(10, 10), new Int2(35, 1));
+            switcher.WaitForInput();
 
             Console.ReadKey(true);
+        }
+
+        static bool MapSwitcherChanged(Switcher switcher, SwitcherOption switcherOption)
+        {
+            if (switcherOption.identificator == "width")
+            {
+                prepareMap.Size.x = switcherOption.GetValue();
+            }
+            if (switcherOption.identificator == "height")
+            {
+                prepareMap.Size.y = switcherOption.GetValue();
+            }
+            prepareMap.Draw();
+            return true;
         }
 
         
@@ -96,7 +119,20 @@ namespace Kajaki
     class Map
     {
         public Int2 Position { get; protected set; }
-        public Int2 Size { get; protected set; }
+        Int2 position;
+        public Int2 Size
+        {
+            get
+            {
+                return position;
+            }
+            set
+            {
+                value.x = Arit.Clamp(value.x, 1, int.MaxValue);
+                value.y = Arit.Clamp(value.y, 1, int.MaxValue);
+                position = value;
+            }
+        }
         List<Ship> ships;
 
         Int2 contentPosition;
@@ -108,10 +144,10 @@ namespace Kajaki
         int frame;
 
 
-        public Map(Int2 size)
+        public Map(Int2 size, Int2 position)
         {
             ships = new List<Ship>();
-            Position = new Int2(2, 2);
+            Position = position;
             contentPosition = new Int2(Position.x + 1, Position.y + 1);
             contentSize = size;
             Size = new Int2(size.x + 2, size.y + 2);
