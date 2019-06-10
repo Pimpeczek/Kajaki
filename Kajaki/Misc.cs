@@ -181,6 +181,7 @@ namespace Kajaki
         }
 
 
+
         //Definicje operatorów
         public static Int2 operator +(Int2 i1, Int2 i2) { return new Int2(i1.x + i2.x, i1.y + i2.y); }
         public static Int2 operator +(Int2 i1, int x) { return new Int2(i1.x + x, i1.y + x); }
@@ -194,12 +195,14 @@ namespace Kajaki
         public static Int2 operator /(Int2 i1, Int2 i2) { return new Int2(i1.x / i2.x, i1.y / i2.y); }
         public static Int2 operator /(Int2 i1, int x) { return new Int2(i1.x / x, i1.y / x); }
 
-        public static bool operator ==(Int2 i1, Int2 i2) { if (i1.x == i2.x && i1.y == i2.y) return true; return false; }
-        public static bool operator !=(Int2 i1, Int2 i2) { if (i1.x == i2.x && i1.y == i2.y) return false; return true; }
-        public static bool operator >=(Int2 i1, Int2 i2) { if (i1.x >= i2.x && i1.y >= i2.y) return true; return false; }
-        public static bool operator <=(Int2 i1, Int2 i2) { if (i1.x <= i2.x && i1.y <= i2.y) return true; return false; }
-        public static bool operator >(Int2 i1, Int2 i2) { if (i1.x > i2.x && i1.y > i2.y) return true; return false; }
-        public static bool operator <(Int2 i1, Int2 i2) { if (i1.x < i2.x && i1.y < i2.y) return true; return false; }
+        public static bool operator ==(Int2 i1, Int2 i2) {  if ((object)i2 == null) return (object)i1 == null; if ((object)i1 == null) return (object)i2 == null;
+                                                            if (i1.x == i2.x && i1.y == i2.y) return true; return false; }
+        public static bool operator !=(Int2 i1, Int2 i2) {  if ((object)i2 == null) return (object)i1 != null; if ((object)i1 == null) return (object)i2 != null;
+                                                            if (i1.x == i2.x && i1.y == i2.y) return false; return true; }
+        public static bool operator >=(Int2 i1, Int2 i2) {  if (i1.x >= i2.x && i1.y >= i2.y) return true; return false; }
+        public static bool operator <=(Int2 i1, Int2 i2) {  if (i1.x <= i2.x && i1.y <= i2.y) return true; return false; }
+        public static bool operator >(Int2 i1, Int2 i2) {   if (i1.x > i2.x && i1.y > i2.y) return true; return false; }
+        public static bool operator <(Int2 i1, Int2 i2) {   if (i1.x < i2.x && i1.y < i2.y) return true; return false; }
 
 
         public override bool Equals(object obj)

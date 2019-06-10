@@ -10,6 +10,7 @@ namespace Kajaki
 {
     class Program
     {
+        static int someCounter = 0;
         static Int2 windowSize;
         static Map prepareMap;
         static void Main(string[] args)
@@ -55,7 +56,7 @@ namespace Kajaki
 
             
 
-            prepareMap = new Map(new Int2(10, 10), new Int2(35, 1));
+            prepareMap = new Map(new Int2(12, 12), new Int2(35, 1));
             switcher.WaitForInput();
 
             Console.ReadKey(true);
@@ -63,13 +64,14 @@ namespace Kajaki
 
         static bool MapSwitcherChanged(Switcher switcher, SwitcherOption switcherOption)
         {
+           
             if (switcherOption.identificator == "width")
             {
-                prepareMap.Size.x = switcherOption.GetValue();
+                prepareMap.Size = new Int2( switcherOption.GetValue(), prepareMap.Size.y);
             }
             if (switcherOption.identificator == "height")
             {
-                prepareMap.Size.y = switcherOption.GetValue();
+                prepareMap.Size = new Int2(prepareMap.Size.x, switcherOption.GetValue());
             }
             prepareMap.Draw();
             return true;
@@ -119,28 +121,31 @@ namespace Kajaki
     class Map
     {
         public Int2 Position { get; protected set; }
-        Int2 position;
+        Int2 size;
         public Int2 Size
         {
             get
             {
-                return position;
+                return contentSize;
             }
             set
             {
-                value.x = Arit.Clamp(value.x, 1, int.MaxValue);
-                value.y = Arit.Clamp(value.y, 1, int.MaxValue);
-                position = value;
+                EraseBorders(value);
+                contentSize = new Int2(Arit.Clamp(value.x, 1, int.MaxValue), Arit.Clamp(value.y, 1, int.MaxValue));
+                size = new Int2(contentSize.x + 2, contentSize.y + 2);
+                SetupLines();
+                
             }
         }
         List<Ship> ships;
 
         Int2 contentPosition;
-        Int2 contentSize;
-        string waterLane;
+        Int2 contentSize = new Int2(10, 10);
+        public string waterLane;
         string upBorder;
-        string midBorder;
+        public string midBorder;
         string downBorder;
+        string emptyLine;
         int frame;
 
 
@@ -149,16 +154,40 @@ namespace Kajaki
             ships = new List<Ship>();
             Position = position;
             contentPosition = new Int2(Position.x + 1, Position.y + 1);
-            contentSize = size;
-            Size = new Int2(size.x + 2, size.y + 2);
+            Size = size;
             frame = 0;
 
-            waterLane = Misc.GetFilledString(Size.x - 2, Bars.transparent[1]);
-            upBorder = $"█{Misc.GetFilledString(Size.x - 2, '█')}█";
-            midBorder = $"█{waterLane}█";
-            downBorder = $"█{Misc.GetFilledString(Size.x - 2, '█')}█";
+            
         }
 
+        void EraseBorders(Int2 newSize)
+        {
+            if (emptyLine == null)
+                return;
+            if (contentSize == null)
+                return;
+            if (newSize == null)
+                return;
+            //Renderer.Write(emptyLine, Position);
+            if (contentSize.y > newSize.y)
+            Renderer.Write(emptyLine, Position.x, Position.y + Size.y - 1);
+            if (contentSize.x > newSize.x)
+                for (int y = 0; y < size.y - 1; y++)
+            {
+                //Renderer.Write(" ", Position.x, Position.y + y);
+                Renderer.Write(" ", Position.x + size.x - 1, Position.y + y);
+
+            }
+        }
+
+        void SetupLines()
+        {
+            waterLane = Misc.GetFilledString(contentSize.x, Bars.transparent[1]);
+            upBorder = $"█{Misc.GetFilledString(contentSize.x, '█')}█";
+            midBorder = $"█{waterLane}█";
+            emptyLine = Misc.GetFilledString(contentSize.x + 2, ' ');
+            downBorder =(string) upBorder.Clone();
+        }
 
         public void Draw()
         {
@@ -175,14 +204,11 @@ namespace Kajaki
 
         void DrawMapRaw()
         {
-            Console.SetCursorPosition(Position.x, Position.y);
-            Console.Write(upBorder);
-            Console.SetCursorPosition(Position.x, Position.y+ Size.y -1);
-            Console.Write(downBorder);
+            Renderer.Write(upBorder, Position);
+            Renderer.Write(downBorder, Position.x, Position.y+ Size.y -1);
             for (int y = 1; y < Size.y - 1; y++)
             {
-                Console.SetCursorPosition(Position.x, Position.y + y);
-                Console.Write(midBorder);
+                Renderer.Write(midBorder, Position.x, Position.y + y);
             }
         }
 
