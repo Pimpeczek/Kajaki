@@ -15,12 +15,12 @@ namespace Kajaki
         static Map prepareMap;
         static void Main(string[] args)
         {
-            windowSize = new Int2(200, 50);
-            Console.SetWindowSize(200, 50);
+            windowSize = new Int2(160, 50);
+            Console.SetWindowSize(windowSize.x, windowSize.y);
 
             Console.CursorVisible = false;
             Int2 menuSize = new Int2(40, 10);
-            Menu mainMenu = new Menu(new Int2((windowSize.x - menuSize.x) /2, (windowSize.y - menuSize.y) / 2), menuSize, "Main menu", Boxes.BoxType.doubled);
+            Menu_dep mainMenu = new Menu_dep(new Int2((windowSize.x - menuSize.x) /2, (windowSize.y - menuSize.y) / 2), menuSize, "Main menu", Boxes.BoxType.doubled);
             mainMenu.HorizontalAlignment = Renderer.HorizontalTextAlignment.middle;
             mainMenu.VerticallAlignment = Renderer.VerticalTextAlignment.middle;
             mainMenu.AddOption("Host a game", 0);
@@ -49,20 +49,24 @@ namespace Kajaki
         static void SetupBoard()
         {
 
-            Switcher switcher = new Switcher(new Int2(1, 1), new Int2(30, 15), "Board Options", Boxes.BoxType.doubled);
-            switcher.AddOption(new IntSwitcherOption("Board width", "width", 10, 10, 50, 1));
-            switcher.AddOption(new IntSwitcherOption("Board height", "height", 10, 10, 40, 1));
-            switcher.AddChangeAction(MapSwitcherChanged);
+            Menu switcher = new Menu(new Int2(1, 1), new Int2(30, 15), "Board Options", Boxes.BoxType.doubled);
+            switcher.AddControll(new IntSwitcherControll("Board width", "width", 10, 10, 50, 1));
+            switcher.GetControll("width").AddAction(MapSwitcherChanged);
+            switcher.AddControll(new IntSwitcherControll("Board height", "height", 10, 10, 40, 1));
+            switcher.GetControll("height").AddAction(MapSwitcherChanged);
+            switcher.AddControll(new MenuControll("Exit", "exit"));
+            switcher.GetControll("exit").AddAction(switcher.Exit);
 
-            
 
-            prepareMap = new Map(new Int2(12, 12), new Int2(35, 1));
+
+            prepareMap = new Map(new Int2(10, 10), new Int2(35, 1));
+            prepareMap.Draw();
             switcher.WaitForInput();
 
             Console.ReadKey(true);
         }
 
-        static bool MapSwitcherChanged(Switcher switcher, SwitcherOption switcherOption)
+        static bool MapSwitcherChanged(MenuControll switcherOption)
         {
            
             if (switcherOption.identificator == "width")

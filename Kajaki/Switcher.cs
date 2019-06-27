@@ -7,22 +7,25 @@ using Pastel;
 
 namespace Kajaki
 {
-    class Switcher
+    class Menu
     {
         public Int2 Position { get; protected set; }
         public Int2 Size { get; protected set; }
         public string Name { get; protected set; }
+        public bool waitForInput;
         Boxes.BoxType boxType;
-        List<SwitcherOption> options;
+        List<MenuControll> controlls;
         List<(string, int)> bottomButtons;
         int hPoint;
         int scrollPoint;
         string emptyLine;
-        List<Func<Switcher, SwitcherOption, bool>> actions;
-        public Switcher(Int2 position, Int2 size, string name, Boxes.BoxType boxType)
+        List<Func<Menu, MenuControll, bool>> actions;
+        List<(ConsoleKey, int)> bindings;
+        public Menu(Int2 position, Int2 size, string name, Boxes.BoxType boxType)
         {
-            options = new List<SwitcherOption>();
-            actions = new List<Func<Switcher, SwitcherOption, bool>>();
+            waitForInput = false;
+               controlls = new List<MenuControll>();
+            actions = new List<Func<Menu, MenuControll, bool>>();
             bottomButtons = new List<(string, int)>();
             hPoint = 0;
             scrollPoint = 0;
@@ -33,31 +36,31 @@ namespace Kajaki
             this.boxType = boxType;
         }
 
-        public void AddChangeAction(Func<Switcher, SwitcherOption, bool> action)
+        public void AddChangeAction(Func<Menu, MenuControll, bool> action)
         {
             actions.Add(action);
         }
 
-        public void AddOption(SwitcherOption switcherOption)
+        public void AddControll(MenuControll switcherOption)
         {
-            for (int i = 0; i < options.Count; i++)
+            for (int i = 0; i < controlls.Count; i++)
             {
-                if (options[i].identificator == switcherOption.identificator)
+                if (controlls[i].identificator == switcherOption.identificator)
                 {
-                    options[i] = switcherOption;
+                    controlls[i] = switcherOption;
                     return;
                 }
             }
-            options.Add(switcherOption);
+            controlls.Add(switcherOption);
         }
 
         public int GetValue(string identificator)
         {
-            for (int i = 0; i < options.Count; i++)
+            for (int i = 0; i < controlls.Count; i++)
             {
-                if (options[i].identificator == identificator)
+                if (controlls[i].identificator == identificator)
                 {
-                    return options[i].GetValue();
+                    return controlls[i].GetValue();
                 }
             }
             throw new Exception("NoSuchIdentificator");
@@ -68,12 +71,20 @@ namespace Kajaki
             bottomButtons.Add((name, returnVal));
         }
 
-        public int WaitForInput()
+        public bool Exit(MenuControll controll)
         {
+            waitForInput = false;
+            
+            return true;
+        }
+
+        public void WaitForInput()
+        {
+            waitForInput = true;
             ConsoleKey response;
             Draw();
-            DrawOptions();
-            Renderer.Write($"{options[0].name} {options[0].GetValue()} {((IntSwitcherOption)options[0]).Min} {((IntSwitcherOption)options[0]).Max}", new Int2(41, 1));
+            DrawControlls();
+            Renderer.Write($"{controlls[0].Name} {controlls[0].GetValue()} {((IntSwitcherControll)controlls[0]).Min} {((IntSwitcherControll)controlls[0]).Max}", new Int2(41, 1));
             do
             {
                 response = Console.ReadKey(true).Key;
@@ -86,40 +97,47 @@ namespace Kajaki
                         hPoint++;
                         break;
                     case ConsoleKey.LeftArrow:
-                        if (hPoint < options.Count)
+                        if (hPoint < controlls.Count)
                         {
-                            options[hPoint].SwitchLeft();
-                            RunActions();
+                            controlls[hPoint].SwitchLeft();
                         }
                         else
                             hPoint--;
                         break;
                     case ConsoleKey.RightArrow:
-                        if (hPoint < options.Count)
+                        if (hPoint < controlls.Count)
                         {
-                            options[hPoint].SwitchRight();
-                            RunActions();
+                            controlls[hPoint].SwitchRight();
+                        }
+                        else
+                            hPoint++;
+                        break;
+                    case ConsoleKey.Enter:
+                        if (hPoint < controlls.Count)
+                        {
+                            controlls[hPoint].Enter();
                         }
                         else
                             hPoint++;
                         break;
                 }
                 if (hPoint < 0)
-                    hPoint += (options != null && options.Count > 0 ? options.Count : 1);
-                hPoint %= (options != null && options.Count > 0 ? options.Count + bottomButtons.Count : 1);
+                    hPoint += (controlls != null && controlls.Count > 0 ? controlls.Count : 1);
+                hPoint %= (controlls != null && controlls.Count > 0 ? controlls.Count + bottomButtons.Count : 1);
 
 
-                DrawOptions();
+                DrawControlls();
 
-            } while (response != ConsoleKey.Enter || hPoint < options.Count);
-            return bottomButtons[hPoint - options.Count].Item2;
+            } while (waitForInput);
+
+            Erase();
         }
 
         void RunActions()
         {
             for (int i = 0; i < actions.Count; i++)
             {
-                actions[i].Invoke(this, options[hPoint]);
+                actions[i].Invoke(this, controlls[hPoint]);
             }
         }
 
@@ -127,19 +145,31 @@ namespace Kajaki
         {
             Console.ForegroundColor = ConsoleColor.White;
             Boxes.DrawBox(boxType, Position.x, Position.y, Size.x, Size.y);
-            Console.Write(Name, Position.x + (Size.x - Name.Length) / 2, Position.y);
+            Renderer.Write(Name, Position.x + (Size.x - Name.Length) / 2, Position.y);
+
+        }
+        public void Erase()
+        {
+
+            string fullEmptyLine = emptyLine + "  ";
+
+            for(int y = 0; y < Size.y; y++)
+            {
+                Renderer.Write(fullEmptyLine, Position.x, Position.y + y);
+            }
+            
 
         }
 
 
-        void DrawOptions()
+        void DrawControlls()
         {
-            int startHeight = Arit.Clamp((Size.y - 2 - options.Count) / 2, 0, Size.y);
+            int startHeight = Arit.Clamp((Size.y - 2 - controlls.Count) / 2, 0, Size.y);
             string printText;
             Int2 pos;
-            for (int i = 0; i < options.Count && i < Size.y - 2; i++)
+            for (int i = 0; i < controlls.Count && i < Size.y - 2; i++)
             {
-                printText = options[i + scrollPoint].PrintableText;
+                printText = controlls[i + scrollPoint].PrintableText;
                 pos = new Int2(Position.x + 1, Position.y + startHeight + i + 1);
                 Renderer.Write(emptyLine, pos);
                 pos = new Int2(Position.x + (Size.x - printText.Length) / 2, Position.y + startHeight + i + 1);
@@ -157,7 +187,7 @@ namespace Kajaki
             {
                 pos = new Int2(Position.x + leftDist, Position.y + Size.y - 1);
                 printText = $"[{bottomButtons[i].Item1}]";
-                if (hPoint - options.Count == i)
+                if (hPoint - controlls.Count == i)
                 {
                     Renderer.Write(printText.PastelBg(Color.Gray), pos);
                 }
@@ -169,29 +199,74 @@ namespace Kajaki
             }
 
         }
+
+        public MenuControll GetControll(string identificator)
+        {
+            for(int i = 0; i < controlls.Count; i++)
+            {
+                if (identificator == controlls[i].identificator)
+                    return controlls[i];
+            }
+            return null;
+        }
     }
 
-    class SwitcherOption
+    class MenuControll
     {
-        public string name;
+        protected string name;
+        public string Name
+        {
+            get
+            {
+                return name;
+            }
+            set
+            {
+                name = value;
+                PrintableText = $"{name}";
+            }
+        }
         public string identificator;
         public string PrintableText { get; protected set; }
+        public Menu parentMenu { get; protected set; }
+        public List<Func<MenuControll, bool>> actions;
 
-
-        public SwitcherOption(string name, string identificator)
+        public MenuControll(string name, string identificator)
         {
-            this.name = name;
+            actions = new List<Func<MenuControll, bool>>();
+            Name = name;
             this.identificator = identificator;
-            PrintableText = $"{name}: <?>";
+            
+        }
+
+        public virtual void AddAction(Func<MenuControll, bool> action)
+        {
+            actions.Add(action);
+        }
+        public virtual void AddAction(IEnumerable< Func<MenuControll, bool>> action)
+        {
+            actions.AddRange(action);
         }
 
         public virtual void SwitchLeft()
         {
-
+            RunActions();
         }
         public virtual void SwitchRight()
         {
+            RunActions();
+        }
+        public virtual void Enter()
+        {
+            RunActions();
+        }
 
+        protected virtual void RunActions()
+        {
+            for (int i = 0; i < actions.Count; i++)
+            {
+                actions[i].Invoke(this);
+            }
         }
 
         public virtual int GetValue()
@@ -201,7 +276,7 @@ namespace Kajaki
 
     }
 
-    class IntSwitcherOption : SwitcherOption
+    class IntSwitcherControll : MenuControll
     {
         private int value;
         public int Value
@@ -246,7 +321,7 @@ namespace Kajaki
 
         public int Step { get; set; }
 
-        public IntSwitcherOption(string name, string identificator, int value, int min, int max, int step) : base(name, identificator)
+        public IntSwitcherControll(string name, string identificator, int value, int min, int max, int step) : base(name, identificator)
         {
             if (min > max)
                 min = max;
@@ -259,11 +334,15 @@ namespace Kajaki
         override public void SwitchLeft()
         {
             Value -= Step;
+            RunActions();
         }
         override public void SwitchRight()
         {
             Value += Step;
+            RunActions();
         }
+
+        public override void Enter(){return;}
 
         override public int GetValue()
         {
@@ -271,7 +350,7 @@ namespace Kajaki
         }
     }
 
-    class StringSwitcherOption : SwitcherOption
+    class StringSwitcherString : MenuControll
     {
         private int value;
         public int Value
@@ -293,7 +372,7 @@ namespace Kajaki
 
         public int step;
 
-        public StringSwitcherOption(string name, string identificator, string options) : base(name, identificator)
+        public StringSwitcherString(string name, string identificator, string options) : base(name, identificator)
         {
 
             max = min = 0;
@@ -313,11 +392,15 @@ namespace Kajaki
         override public void SwitchLeft()
         {
             Value -= step;
+            RunActions();
         }
         override public void SwitchRight()
         {
             Value += step;
+            RunActions();
         }
+
+        public override void Enter() { return; }
 
         override public int GetValue()
         {

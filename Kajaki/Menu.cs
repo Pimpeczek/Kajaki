@@ -5,7 +5,7 @@ using Pastel;
 
 namespace Kajaki
 {
-    class Menu
+    class Menu_dep
     {
         public Int2 Position { get; protected set; }
         public Int2 Size { get; protected set; }
@@ -53,7 +53,7 @@ namespace Kajaki
 
         char[] boxes;
 
-        public Menu(Int2 position, Int2 size, string name, Boxes.BoxType boxType)
+        public Menu_dep(Int2 position, Int2 size, string name, Boxes.BoxType boxType)
         {
             isDrawn = false;
             options = new List<(string, int)>();
