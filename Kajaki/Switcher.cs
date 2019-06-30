@@ -11,7 +11,24 @@ namespace Kajaki
     {
         public Int2 Position { get; protected set; }
         public Int2 Size { get; protected set; }
-        public string Name { get; protected set; }
+        protected string name;
+        public string Name
+        {
+            get
+            {
+                return name;
+            }
+            set
+            {
+                name = value;
+
+                if(IsVIsable)
+                {
+                    Draw();
+                }
+
+            }
+        }
         public bool waitForInput;
         Boxes.BoxType boxType;
         List<MenuControll> controlls;
@@ -19,13 +36,13 @@ namespace Kajaki
         int hPoint;
         int scrollPoint;
         string emptyLine;
-        List<Func<Menu, MenuControll, bool>> actions;
-        List<(ConsoleKey, int)> bindings;
+        List<(ConsoleKey, Func<MenuEvent, bool>)> bindings;
+        public bool IsVIsable { get; protected set; }
         public Menu(Int2 position, Int2 size, string name, Boxes.BoxType boxType)
         {
             waitForInput = false;
-               controlls = new List<MenuControll>();
-            actions = new List<Func<Menu, MenuControll, bool>>();
+            controlls = new List<MenuControll>();
+            bindings = new List<(ConsoleKey, Func<MenuEvent, bool>)>();
             bottomButtons = new List<(string, int)>();
             hPoint = 0;
             scrollPoint = 0;
@@ -36,10 +53,7 @@ namespace Kajaki
             this.boxType = boxType;
         }
 
-        public void AddChangeAction(Func<Menu, MenuControll, bool> action)
-        {
-            actions.Add(action);
-        }
+        
 
         public void AddControll(MenuControll switcherOption)
         {
@@ -51,6 +65,7 @@ namespace Kajaki
                     return;
                 }
             }
+            switcherOption.SetParent(this);
             controlls.Add(switcherOption);
         }
 
@@ -71,7 +86,7 @@ namespace Kajaki
             bottomButtons.Add((name, returnVal));
         }
 
-        public bool Exit(MenuControll controll)
+        public bool Exit(MenuEvent e)
         {
             waitForInput = false;
             
@@ -84,7 +99,7 @@ namespace Kajaki
             ConsoleKey response;
             Draw();
             DrawControlls();
-            Renderer.Write($"{controlls[0].Name} {controlls[0].GetValue()} {((IntSwitcherControll)controlls[0]).Min} {((IntSwitcherControll)controlls[0]).Max}", new Int2(41, 1));
+            //Renderer.Write($"{controlls[0].Name} {controlls[0].GetValue()} {((IntSwitcherControll)controlls[0]).Min} {((IntSwitcherControll)controlls[0]).Max}", new Int2(41, 1));
             do
             {
                 response = Console.ReadKey(true).Key;
@@ -133,16 +148,18 @@ namespace Kajaki
             Erase();
         }
 
-        void RunActions()
+        void RunBindings(ConsoleKey key)
         {
-            for (int i = 0; i < actions.Count; i++)
+            for (int i = 0; i < bindings.Count; i++)
             {
-                actions[i].Invoke(this, controlls[hPoint]);
+                if(key == bindings[i].Item1)
+                    bindings[i].Item2.Invoke(new MenuBindingEvent(this, key));
             }
         }
 
         public void Draw()
         {
+            IsVIsable = true;
             Console.ForegroundColor = ConsoleColor.White;
             Boxes.DrawBox(boxType, Position.x, Position.y, Size.x, Size.y);
             Renderer.Write(Name, Position.x + (Size.x - Name.Length) / 2, Position.y);
@@ -150,7 +167,7 @@ namespace Kajaki
         }
         public void Erase()
         {
-
+            IsVIsable = false;
             string fullEmptyLine = emptyLine + "  ";
 
             for(int y = 0; y < Size.y; y++)
@@ -229,32 +246,37 @@ namespace Kajaki
         public string identificator;
         public string PrintableText { get; protected set; }
         public Menu parentMenu { get; protected set; }
-        public List<Func<MenuControll, bool>> actions;
+        public List<Func<MenuEvent, bool>> actions;
 
         public MenuControll(string name, string identificator)
         {
-            actions = new List<Func<MenuControll, bool>>();
+            actions = new List<Func<MenuEvent, bool>>();
             Name = name;
             this.identificator = identificator;
             
         }
 
-        public virtual void AddAction(Func<MenuControll, bool> action)
+        public virtual void AddAction(Func<MenuEvent, bool> action)
         {
             actions.Add(action);
         }
-        public virtual void AddAction(IEnumerable< Func<MenuControll, bool>> action)
+        public virtual void AddAction(IEnumerable< Func<MenuEvent, bool>> action)
         {
             actions.AddRange(action);
         }
 
+        public virtual void SetParent(Menu menu)
+        {
+            parentMenu = menu;
+        }
+
         public virtual void SwitchLeft()
         {
-            RunActions();
+            //RunActions();
         }
         public virtual void SwitchRight()
         {
-            RunActions();
+            //RunActions();
         }
         public virtual void Enter()
         {
@@ -265,7 +287,7 @@ namespace Kajaki
         {
             for (int i = 0; i < actions.Count; i++)
             {
-                actions[i].Invoke(this);
+                actions[i].Invoke(new MenuControllEvent(parentMenu, this));
             }
         }
 
@@ -350,7 +372,7 @@ namespace Kajaki
         }
     }
 
-    class StringSwitcherString : MenuControll
+    class StringSwitcherControll : MenuControll
     {
         private int value;
         public int Value
@@ -372,7 +394,7 @@ namespace Kajaki
 
         public int step;
 
-        public StringSwitcherString(string name, string identificator, string options) : base(name, identificator)
+        public StringSwitcherControll(string name, string identificator, string options) : base(name, identificator)
         {
 
             max = min = 0;
@@ -405,6 +427,90 @@ namespace Kajaki
         override public int GetValue()
         {
             return Value;
+        }
+    }
+
+    class CheckBoxControll : MenuControll
+    {
+        private int value;
+        public int Value
+        {
+            get
+            {
+                return value;
+            }
+            set
+            {
+                this.value = Arit.Clamp(value, 0, 1);
+                PrintableText = $"{name}: [{(this.value == 0 ? ' ' : '+')}]";
+            }
+        }
+
+        public CheckBoxControll(string name, string identificator, bool startValue) : base(name, identificator)
+        {
+            Value = (startValue? 1 : 0);
+        }
+
+        override public void SwitchLeft()
+        {
+            Toggle();
+            RunActions();
+        }
+        override public void SwitchRight()
+        {
+            Toggle();
+            RunActions();
+        }
+
+        public override void Enter()
+        {
+            Toggle();
+            RunActions();
+            return;
+        }
+
+        void Toggle()
+        {
+            if (value == 0)
+                Value = 1;
+            else
+                Value = 0;
+        }
+
+        override public int GetValue()
+        {
+
+            return Value;
+        }
+    }
+
+
+
+    class MenuEvent
+    {
+        public string Name { get; protected set; }
+        public Menu Menu { get; protected set; }
+        public MenuEvent(Menu menu)
+        {
+            Menu = menu;
+        }
+    }
+
+    class MenuControllEvent : MenuEvent
+    {
+        public MenuControll Controll { get; protected set; }
+        public MenuControllEvent(Menu menu, MenuControll controll) : base(menu)
+        {
+            Controll = controll;
+        }
+    }
+
+    class MenuBindingEvent : MenuEvent
+    {
+        public ConsoleKey Key { get; protected set; }
+        public MenuBindingEvent(Menu menu, ConsoleKey key) : base(menu)
+        {
+            Key = key;
         }
     }
 }
