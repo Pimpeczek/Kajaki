@@ -47,11 +47,23 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="Menu.cs" />
+    <Compile Include="Map.cs" />
+    <Compile Include="UI\Controlls\CheckBoxControll.cs" />
+    <Compile Include="UI\Controlls\IntSwitcherControll.cs" />
+    <Compile Include="UI\Events\IntSwitcherEvent.cs" />
+    <Compile Include="UI\Controlls\LineSeparatorControll.cs" />
+    <Compile Include="UI\Events\MenuControllEvent.cs" />
+    <Compile Include="UI\Events\MenuEvent.cs" />
+    <Compile Include="UI\Controlls\LabelControll.cs" />
+    <Compile Include="Menu_dep.cs" />
     <Compile Include="Misc.cs" />
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
-    <Compile Include="Switcher.cs" />
+    <Compile Include="Renderer.cs" />
+    <Compile Include="UI\Menu.cs" />
+    <Compile Include="UI\Controlls\MenuControll.cs" />
+    <Compile Include="UI\Controlls\StringSwitcherControll.cs" />
+    <Compile Include="UI\Controlls\SwitcherControll.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="App.config" />

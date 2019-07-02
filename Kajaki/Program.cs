@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-using System.Threading;
+using System.Text;
 using System.Drawing;
 using Pastel;
 
@@ -14,138 +14,318 @@ namespace Kajaki
     class Program
     {
         static int someCounter = 0;
-        static Int2 windowSize;
-        static Map prepareMap;
+
+        static Logo l;
         static void Main(string[] args)
         {
-            windowSize = new Int2(160, 50);
-            Console.SetWindowSize(windowSize.x, windowSize.y);
-
-            Console.CursorVisible = false;
+            Renderer.AsyncFrameLenght = 16;
+            Renderer.WindowSize = new Int2(160, 50);
+            Renderer.DebugMode = true;
+            /*
+            for(int i = 0; i < 711; i++)
+            {
+                Console.Write($"{$"{i*16}".PadLeft(5, '0')}: ");
+                for(int j = 0; j < 16; j++)
+                {
+                    Console.Write(((Char)(i*16+j)) + (j < 15?"  |  ":"\n"));
+                }
+            }
+            Console.ReadKey(true);
+            */
             Int2 menuSize = new Int2(40, 10);
-            Menu mainMenu = new Menu(new Int2((windowSize.x - menuSize.x) /2, (windowSize.y - menuSize.y) / 2), menuSize, "Main menu", Boxes.BoxType.doubled);
+
+            l = new Logo();
+            l.Text = "______       _   _   _           _     _           ";
+            l.Text += "\n| ___ \\     | | | | | |         | |   (_)          ";
+            l.Text += "\n| |_/ / __ _| |_| |_| | ___  ___| |__  _ _ __  ___ ";
+            l.Text += "\n| ___ \\/ _` | __| __| |/ _ \\/ __| '_ \\| | '_ \\/ __|";
+            l.Text += "\n| |_/ / (_| | |_| |_| |  __/\\__ \\ | | | | |_) \\__ \\";
+            l.Text += "\n\\____/ \\__,_|\\__|\\__|_|\\___||___/_| |_|_| .__/|___/";
+            l.Text += "\n                                        | |        ";
+            l.Text += "\n                                        |_|        ";
+            l.Position = new Int2((Renderer.WindowSize.x - l.Size.x) / 2, 2);
+            l.Draw();
+
+
+            Menu mainMenu = new Menu(new Int2((Renderer.WindowSize.x - menuSize.x) /2, (Renderer.WindowSize.y - menuSize.y) / 2), menuSize, "Main menu", Boxes.BoxType.doubled);
+            mainMenu.AddControll(new LineSeparatorControll("sep0", "sep0"));
             mainMenu.AddControll(new MenuControll("Host a game", "host"));
-            mainMenu.GetControll("host").AddAction(SetupGame);
+            mainMenu.GetControll("host").AddAction(HostAGame);
             mainMenu.AddControll(new MenuControll("Ships", "ships"));
             mainMenu.AddControll(new MenuControll("Ship designer", "designer"));
+            mainMenu.AddControll(new LineSeparatorControll("sep1", "sep1"));
             mainMenu.AddControll(new MenuControll("Exit", "exit"));
-            mainMenu.GetControll("ships").AddAction(ShipSetup);
+
             mainMenu.GetControll("exit").AddAction(mainMenu.Exit);
+
+            mainMenu.AddControll(new LineSeparatorControll("sep_fin", "sep_fin"));
+
             mainMenu.WaitForInput();
+
+            Renderer.AsyncMode = false;
 
         }
 
-        static bool SetupGame(MenuEvent e)
+        static bool HostAGame(MenuEvent e)
+        {
+            l.Erase();
+            
+            GameSetup.SetupGame(e);
+            l.Draw();
+
+            return true;
+        }
+        
+
+        
+    
+    }
+
+    class Logo
+    {
+        protected string[] textLines;
+        protected string text;
+        public Int2 Size {get; protected set;}
+        public bool visable;
+        string emptyLine = "";
+        public string Text
+        {
+            get
+            {
+                return text;
+            }
+            set
+            {
+                bool redraw = visable;
+                if(redraw)
+                {
+                    Erase();
+                }
+
+                text = value;
+                textLines = text.Split('\n');
+                Size = new Int2(0, textLines.Length);
+                for(int i = 0; i < textLines.Length; i++)
+                {
+                    if (textLines[i].Length > Size.x)
+                        Size.x = textLines[i].Length;
+                }
+                emptyLine = Stringer.GetFilledString(Size.x, ' ');
+                if (redraw)
+                {
+                    Draw();
+                }
+            }
+        }
+
+        protected Int2 position;
+        public Int2 Position
+        {
+            get
+            {
+                return position;
+            }
+            set
+            {
+                bool redraw = visable;
+                if (redraw)
+                {
+                    Erase();
+                }
+
+                position = value;
+
+                if (redraw)
+                {
+                    Draw();
+                }
+            }
+        }
+
+
+        public void Draw()
+        {
+            visable = true;
+            for(int y = 0; y < textLines.Length; y++)
+            {
+                Renderer.Write(textLines[y], position.x, position.y + y);
+            }
+
+        }
+
+        public void Erase()
+        {
+            visable = false;
+            
+            for (int y = 0; y < textLines.Length; y++)
+            {
+                Renderer.Write(emptyLine, position.x, position.y + y);
+            }
+        }
+    }
+
+    class GameSetup
+    {
+        static int[] ships = new int[8];
+        static Int2 mapSize;
+        static Map prepareMap;
+
+        public static bool SetupGame(MenuEvent e)
         {
             e.Menu.Erase();
-            Menu gameMenu = new Menu(new Int2(1, 1), new Int2(30, 15), "Game Setup", Boxes.BoxType.doubled);
-            gameMenu.AddControll(new MenuControll("Game options", "game"));
-            gameMenu.GetControll("game").AddAction(SetupGameOptions);
-            gameMenu.AddControll(new MenuControll("Board options", "board"));
-            gameMenu.GetControll("board").AddAction(SetupBoard);
-            gameMenu.AddControll(new MenuControll("Ship counts", "ships"));
-            gameMenu.GetControll("ships").AddAction(AddShips);
+            GameSetup GS = new GameSetup();
+            prepareMap = new Map(new Int2(10, 10), new Int2());
+            Menu gameMenu = new Menu(new Int2(1, 1), new Int2(30, 45), "Game Setup", Boxes.BoxType.doubled)
+            {
+                VerticalTextWrapping = Menu.Wrapping.wrapping
+            };
+            gameMenu.AddControll(new LineSeparatorControll("sep0", "sep0"));
+            gameMenu.AddControll(new LabelControll("- Game options -", "game_label"));
+            gameMenu.AddControll(new IntSwitcherControll("Turn timer", "timer")
+            {
+                Max = 600,
+                Min = 0,
+                Step = 10,
+                Value = 0,
+                MinSpecialText = "No timer",
+            });
+            gameMenu.AddControll(new IntSwitcherControll("Collision distance", "col_dist")
+            {
+                Value = 1,
+                Min = 0,
+                Max = 16,
+                Step = 1,
+            });
+            gameMenu.AddControll(new CheckBoxControll("Corner collisions", "cor_coll", true)
+            {
+                TrueValue = "■",
+                FalseValue = " "
+            });
+
+            gameMenu.AddControll(new LineSeparatorControll("sep1", "sep1"));
+            gameMenu.AddControll(new LabelControll("- Board -", "board_label"));
+            
+            gameMenu.AddControll(new IntSwitcherControll("Board width", "width", 10, 4, 50, 1));
+            gameMenu.GetControll("width").AddAction(MapSwitcherChanged);
+            gameMenu.AddControll(new IntSwitcherControll("Board height", "height", 10, 4, 40, 1));
+            gameMenu.GetControll("height").AddAction(MapSwitcherChanged);
+
+            gameMenu.AddControll(new LineSeparatorControll("sep2", "sep2"));
+            gameMenu.AddControll(new LabelControll("- Ships -", "ships_label"));
+
+            for(int i = 0; i < 8; i++)
+            {
+                gameMenu.AddControll(new IntSwitcherControll($"Lenght {i+1}", $"{i+1}len", Arit.Clamp(4 - i, 0, 8), 0, 32, 1));
+                gameMenu.GetControll($"{i+1}len").AddAction(ShipCountChanged);
+                ships[i] = Arit.Clamp(4 - i, 0, 8);
+            }
+            gameMenu.AddControll(new MenuControll("TEST", "test"));
+            gameMenu.GetControll("test").AddAction(TESTING);
+            gameMenu.AddControll(new LineSeparatorControll("sep3", "sep3"));
+            gameMenu.AddControll(new MenuControll("◊ START THE GAME ◊", "start"));
+            gameMenu.AddControll(new LineSeparatorControll("sep4", "sep4"));
             gameMenu.AddControll(new MenuControll("Go back", "exit"));
             gameMenu.GetControll("exit").AddAction(gameMenu.Exit);
 
-
+            gameMenu.AddControll(new LineSeparatorControll("sep_fin", "sep_fin"));
 
             prepareMap = new Map(new Int2(10, 10), new Int2(35, 1));
             prepareMap.Draw();
+
+            DrawShips();
+
             gameMenu.WaitForInput();
 
+            EraseShips();
             prepareMap.Erase();
             e.Menu.Draw();
             return true;
         }
 
-        static bool SetupGameOptions(MenuEvent e)
+
+        public static bool TESTING(MenuEvent e)
         {
-            e.Menu.Erase();
-            Menu switcher = new Menu(new Int2(1, 1), new Int2(30, 15), "Game Options", Boxes.BoxType.doubled);
-            switcher.AddControll(new CheckBoxControll("Test", "test", false));
-            switcher.GetControll("test").AddAction(GameOptionsChagne);
-            switcher.AddControll(new MenuControll("Go back", "exit"));
-            switcher.GetControll("exit").AddAction(switcher.Exit);
-
-
-
-            prepareMap = new Map(new Int2(10, 10), new Int2(35, 1));
-            prepareMap.Draw();
-            switcher.WaitForInput();
-
-            //prepareMap.Erase();
-            e.Menu.Draw();
-            return true;
-        }
-
-        static bool SetupBoard(MenuEvent e)
-        {
-            e.Menu.Erase();
-            Menu switcher = new Menu(new Int2(1, 1), new Int2(30, 15), "Board Options", Boxes.BoxType.doubled);
-            switcher.AddControll(new IntSwitcherControll("Board width", "width", 10, 4, 50, 1));
-            switcher.GetControll("width").AddAction(MapSwitcherChanged);
-            switcher.AddControll(new IntSwitcherControll("Board height", "height", 10, 4, 40, 1));
-            switcher.GetControll("height").AddAction(MapSwitcherChanged);
-            switcher.AddControll(new MenuControll("Go back", "exit"));
-            switcher.GetControll("exit").AddAction(switcher.Exit);
-
-
-
-            prepareMap = new Map(new Int2(10, 10), new Int2(35, 1));
-            prepareMap.Draw();
-            switcher.WaitForInput();
-
-            //prepareMap.Erase();
-            e.Menu.Draw();
-            return true;
-        }
-
-        static bool GameOptionsChagne(MenuEvent e)
-        {
-            e.Menu.Name = "HEHE";
+            for(int i = 0; i < 1; i++)
+            {
+                prepareMap.Draw();
+            }
 
             return true;
         }
 
-        static bool MapSwitcherChanged(MenuEvent e)
+        public static bool MapSwitcherChanged(MenuEvent e)
         {
+            
             MenuControll controll = ((MenuControllEvent)e).Controll;
-            if (controll.identificator == "width")
+            Int2 newSize = new Int2();
+            if (controll.Identificator == "width")
             {
-                prepareMap.ContentSize = new Int2(controll.GetValue(), prepareMap.ContentSize.y);
+                if (controll.GetValue() == prepareMap.ContentSize.x)
+                    return false;
+                newSize = new Int2(controll.GetValue(), prepareMap.ContentSize.y);
             }
-            if (controll.identificator == "height")
+            if (controll.Identificator == "height")
             {
-                prepareMap.ContentSize = new Int2(prepareMap.ContentSize.x, controll.GetValue());
+                if (controll.GetValue() == prepareMap.ContentSize.y)
+                    return false;
+                newSize = new Int2(prepareMap.ContentSize.x, controll.GetValue());
             }
+
+            EraseShips();
+            prepareMap.ContentSize = newSize;
             prepareMap.Draw();
+            mapSize = new Int2(prepareMap.Size.x, prepareMap.Size.y);
+            DrawShips();
             return true;
         }
 
-        static bool AddShips(MenuEvent e)
+        public static bool ShipCountChanged(MenuEvent e)
         {
-            e.Menu.Erase();
-            Menu adder = new Menu(new Int2(1, 1), new Int2(30, 15), "Ships", Boxes.BoxType.doubled);
-            int maxLen = Arit.TakeGreater(prepareMap.ContentSize.x, prepareMap.ContentSize.y);
-            adder.AddControll(new MenuControll("Go back", "exit"));
-            adder.GetControll("exit").AddAction(adder.Exit);
-            adder.AddControll(new IntSwitcherControll("√Lenght 1", "1len", 4, 0, 32, 1));
-            adder.AddControll(new IntSwitcherControll("Lenght 2", "2len", 3, 0, 32, 1));
-            adder.AddControll(new IntSwitcherControll("Lenght 3", "3len", 2, 0, 32, 1));
-            adder.AddControll(new IntSwitcherControll("Lenght 4", "4len", 1, 0, 32, 1));
-            adder.AddControll(new IntSwitcherControll("Lenght 5", "5len", 0, 0, 32, 1));
-            adder.AddControll(new IntSwitcherControll("Lenght 6", "6len", 0, 0, 32, 1));
-            adder.AddControll(new IntSwitcherControll("Lenght 7", "7len", 0, 0, 32, 1));
-            adder.AddControll(new IntSwitcherControll("Lenght 8", "8len", 0, 0, 32, 1));
-            adder.GetControll("exit").AddAction(adder.Exit);
-            adder.WaitForInput();
-            e.Menu.Draw();
+            EraseShips();
+            IntSwitcherEvent ise = (IntSwitcherEvent)e;
+            int value = ise.Value;
+            string id = ise.Controll.Identificator;
+            id = id.Replace("len", "");
+            int shipNo;
+            if(!int.TryParse(id, out shipNo))
+            {
+                return false;
+            }
+            ships[shipNo - 1] = value;
+            DrawShips();
             return true;
         }
 
+        static void DrawShips()
+        {
+            Int2 startPos = new Int2(36 + prepareMap.Size.x * 2, 1);
+            for(int i = 0; i < ships.Length; i++)
+            {
+                if (ships[i] > 0)
+                {
+                    Renderer.Write(Stringer.GetFilledString(i * 2 + 2, "░░▒▒").PastelBg(Color.DarkGray).Pastel(Color.LightGray) + $" x{ships[i]}", startPos);
+                    startPos.y += 2;
+                }
+            }
+        }
 
-        static bool ShipSetup(MenuEvent e)
+        static void EraseShips()
+        {
+            Int2 startPos = new Int2(36 + prepareMap.Size.x * 2, 1);
+            string shipStr;
+            for (int i = 0; i < ships.Length; i++)
+            {
+                if (ships[i] > 0)
+                {
+                    shipStr = Stringer.GetFilledString(i * 2 + 2, ' ');
+                    Renderer.Write($"{shipStr}     ", startPos);
+                    startPos.y += 2;
+                }
+            }
+        }
+
+
+        public static bool ShipSetup(MenuEvent e)
         {
             e.Menu.Erase();
             ConsoleKey response;
@@ -163,9 +343,9 @@ namespace Kajaki
             prepareMap.Draw();
             do
             {
-                
+
                 response = Console.ReadKey(true).Key;
-                
+
                 switch (response)
                 {
                     case ConsoleKey.A:
@@ -229,228 +409,20 @@ namespace Kajaki
             return true;
         }
 
-        
-    
-    }
-
-
-
-    class Renderer
-    {
-        public enum HorizontalTextAlignment { left, middle, right }
-        public enum VerticalTextAlignment { upper, middle, lower }
-        public static void Write(string text, Int2 position)
+        static void PrintSetup()
         {
-            Write(text, position.x, position.y);
+            Boxes.DrawBox(Boxes.BoxType.doubled, 1, 17, 30, 30);
         }
-        public static void Write(string text, int x, int y)
-        {
-            Console.SetCursorPosition(x, y);
-            Console.Write(text);
-        }
-        public static void Write(int text, Int2 position)
-        {
-            Write(text, position.x, position.y);
-        }
-        public static void Write(int text, int x, int y)
-        {
-            Console.SetCursorPosition(x, y);
-            Console.Write(text);
-        }
-
-        public static bool IsBorder(Int2 pos, Int2 size)
-        {
-            return !(pos.x > 0 && pos.x < size.x - 1 && pos.y > 0 && pos.y < size.y - 1);
-        }
-
-
     }
 
 
     
 
 
-    class Map
-    {
-        protected Int2 position;
-        public Int2 Position
-        {
-            get
-            {
-                return position;
-            }
-            set
-            {
-                bool doRedraw = IsVisable;
-
-                if(doRedraw)
-                    Erase();
-
-                position = value;
-
-                if(doRedraw)
-                    Draw();
-            }
-        }
-        Int2 size = new Int2(12, 12);
-        public Int2 Size
-        {
-            get
-            {
-                return size;
-            }
-            set
-            {
-                EraseBorders(value);
-                size = new Int2(Arit.Clamp(value.x, 1, int.MaxValue), Arit.Clamp(value.y, 1, int.MaxValue));
-                contentSize = new Int2(size.x - 2, contentSize.y - 2);
-                SetupLines();
-
-            }
-        }
-        Int2 contentSize = new Int2(10, 10);
-        public Int2 ContentSize
-        {
-            get
-            {
-                return contentSize;
-            }
-            set
-            {
-                EraseBorders(value);
-                contentSize = new Int2(Arit.Clamp(value.x, 1, int.MaxValue), Arit.Clamp(value.y, 1, int.MaxValue));
-                size = new Int2(contentSize.x + 2, contentSize.y + 2);
-                SetupLines();
-
-            }
-        }
-        List<Ship> ships;
-        Int2 contentPosition;      
-        public string waterLane;
-        string upBorder;
-        public string midBorder;
-        string downBorder;
-        string emptyLine;
-        int frame;
-        public bool IsVisable { get; protected set; }
-
-        public Map(Int2 contentSize, Int2 position)
-        {
-            ships = new List<Ship>();
-            Position = position;
-            contentPosition = new Int2(Position.x + 1, Position.y + 1);
-            ContentSize = contentSize;
-            frame = 0;
-
-            
-        }
-
-        void EraseBorders(Int2 newSize)
-        {
-            if (emptyLine == null)
-                return;
-            if (contentSize == null)
-                return;
-            if (newSize == null)
-                return;
-            //Renderer.Write(emptyLine, Position);
-            if (contentSize.y > newSize.y)
-            Renderer.Write(emptyLine, Position.x, Position.y + size.y - 1);
-            if (contentSize.x > newSize.x)
-                for (int y = 0; y < size.y; y++)
-                {
-                    //Renderer.Write(" ", Position.x, Position.y + y);
-                    Renderer.Write(" ", Position.x + size.x - 1, Position.y + y);
-
-                }
-        }
-
-        void SetupLines()
-        {
-            waterLane = Misc.GetFilledString(contentSize.x, Bars.transparent[1]);
-            upBorder = $"█{Misc.GetFilledString(contentSize.x, '█')}█";
-            midBorder = $"█{waterLane}█";
-            emptyLine = Misc.GetFilledString(contentSize.x + 2, ' ');
-            downBorder =(string) upBorder.Clone();
-        }
-
-        public void Draw()
-        {
-            IsVisable = true;
-            DrawMapRaw();
-
-            for(int i = 0; i < ships.Count; i++)
-            {
-                for(int j = 0; i < ships[i].decks.Length; j++)
-                {
-                    Renderer.Write("█", ships[i].decks[j].position);
-                }
-            }
-        }
-
-        public void Erase()
-        {
-            IsVisable = false;
-            string fullEmptyLine = emptyLine + "  ";
-            for (int y = 0; y < size.y; y++)
-            {
-                Renderer.Write(fullEmptyLine, Position.x, Position.y + y);
-            }
-        }
-
-        void DrawMapRaw()
-        {
-            Renderer.Write(upBorder, Position);
-            Renderer.Write(downBorder, Position.x, Position.y + size.y -1);
-            for (int y = 1; y < size.y - 1; y++)
-            {
-                Renderer.Write(midBorder, Position.x, Position.y + y);
-            }
-        }
+    
 
 
-    }
-
-    class Deck
-    {
-        public Int2 position;
-        public Ship ship;
-        public Ship.ShipState deckState;
-
-        public void Hit()
-        {
-            deckState = Ship.ShipState.hit;
-            ship.Hit();
-        }
-
-        public void Sunk()
-        {
-            deckState = Ship.ShipState.sunk;
-        }
-
-    }
-
-    class Ship
-    {
-        public enum ShipState {fine, hit, sunk};
-        public int id;
-        public Deck[] decks;
-        public ShipState shipState;
-        public int hits;
-
-        public void Hit()
-        {
-            hits++;
-            if(hits == decks.Length)
-            {
-                for(int i = 0; i < decks.Length; i++)
-                {
-                    decks[i].Sunk();
-                }
-            }
-            shipState = ShipState.sunk;
-        }
-    }
+    
 
 
     class TextBox
@@ -498,7 +470,7 @@ namespace Kajaki
             Position = position;
             Size = size;
             Name = name;
-            emptyLine = Misc.GetFilledString(size.x - 2, ' ');
+            emptyLine = Stringer.GetFilledString(size.x - 2, ' ');
             this.boxType = boxType;
         }
 

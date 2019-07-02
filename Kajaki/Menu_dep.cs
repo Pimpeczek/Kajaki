@@ -127,7 +127,7 @@ namespace Kajaki
             if (!isDrawn)
                 return;
             isDrawn = false;
-            string emptyLine = Misc.GetFilledString(Size.x, ' ');
+            string emptyLine = Stringer.GetFilledString(Size.x, ' ');
             for (int y = 0; y < Size.y; y++)
             {
                 Renderer.Write(emptyLine, Position.x, Position.y + y);
@@ -155,7 +155,7 @@ namespace Kajaki
             string option;
             for (int i = scrollPoint; i < contentSize.y + scrollPoint && i < options.Count; i++)
             {
-                Renderer.Write(Misc.GetFilledString(options[i].Item1.Length, ' '), Position.x + 1 + HorizontalDist(i), Position.y + i + 1 - scrollPoint + startHeight);
+                Renderer.Write(Stringer.GetFilledString(options[i].Item1.Length, ' '), Position.x + 1 + HorizontalDist(i), Position.y + i + 1 - scrollPoint + startHeight);
             }
 
 

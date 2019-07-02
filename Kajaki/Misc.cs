@@ -8,6 +8,27 @@ namespace Kajaki
 {
     class Misc
     {
+        public static List<int> SumListCollumn(List<int[]> list)
+        {
+            List<int> sums = new List<int>();
+            for(int y = 0; y < list.Count; y++)
+            {
+                
+                for (int x = 0; x < list[y].Length; x++)
+                {
+                    if(sums.Count <= x)
+                    {
+                        sums.Add(0);
+                    }
+                    sums[x] += list[y][x];
+                }
+            }
+            return sums;
+        }
+    }
+
+    class Stringer
+    {
         public static int CountChars(string str, char ch)
         {
             int count = 0;
@@ -16,12 +37,21 @@ namespace Kajaki
             return count;
         }
 
-        public static string GetFilledString(int len, char c)
+        public static string GetFilledString(int len, char character)
         {
             string str = "";
             for (int i = 0; i < len; i++)
-                str += c;
+                str += character;
             return str;
+        }
+        public static string GetFilledString(int len, string pattern)
+        {
+            string str = "";
+            while(str.Length < len)
+            {
+                str += pattern;
+            }
+            return str.Substring(0, len);
         }
     }
 
@@ -343,17 +373,14 @@ namespace Kajaki
 
         public static void DrawBox(Char[] bs, int x, int y, int sx, int sy)
         {
-            Console.SetCursorPosition(x, y);
-            Console.Write($"{bs[3]}{"".PadLeft(sx - 2, bs[2])}{bs[0]}");
+            Renderer.Write($"{bs[3]}{"".PadLeft(sx - 2, bs[2])}{bs[0]}", x, y);
             string midBorder = $"{bs[7]}{"".PadLeft(sx - 2)}{bs[7]}";
             for (int i = 1; i < sy - 1; i++)
             {
-                Console.SetCursorPosition(x, y + i);
-                Console.Write(midBorder);
+                Renderer.Write(midBorder, x, y + i);
 
             }
-            Console.SetCursorPosition(x, y + sy - 1);
-            Console.Write($"{bs[9]}{"".PadLeft(sx - 2, bs[2])}{bs[6]}");
+            Renderer.Write($"{bs[9]}{"".PadLeft(sx - 2, bs[2])}{bs[6]}", x, y + sy - 1);
             
         }
 
