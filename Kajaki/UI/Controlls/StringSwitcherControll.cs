@@ -24,10 +24,13 @@ namespace Kajaki
             }
         }
         string[] options;
-        private int min;
-        private int max;
+        protected new readonly int min;
+        protected new int max;
 
-        public int step;
+        protected new int Min;
+        protected new int Max;
+
+        protected new int Step;
 
         public StringSwitcherControll(string name, string identificator, string options) : base(name, identificator)
         {
@@ -35,7 +38,7 @@ namespace Kajaki
             max = min = 0;
             SetOptions(options);
             Value = value;
-            step = 1;
+            Step = 1;
         }
 
         public void SetOptions(string options)
@@ -48,13 +51,18 @@ namespace Kajaki
 
         override public void SwitchLeft()
         {
-            Value -= step;
+            PerformStep(-1);
             RunActions();
         }
         override public void SwitchRight()
         {
-            Value += step;
+            PerformStep(1);
             RunActions();
+        }
+
+        override protected void PerformStep(int direction)
+        {
+            Value += step * oryginalStep;
         }
 
         public override void Enter() { return; }

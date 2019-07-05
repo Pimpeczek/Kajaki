@@ -17,33 +17,7 @@
             }
         }
 
-        private int min = 0;
-        public int Min
-        {
-            get
-            {
-                return min;
-            }
-            set
-            {
-                this.min = Arit.Clamp(value, int.MinValue, max);
-                SetPrintableText();
-            }
-        }
-
-        private int max = 10;
-        public int Max
-        {
-            get
-            {
-                return max;
-            }
-            set
-            {
-                this.max = Arit.Clamp(value, min, int.MaxValue);
-                SetPrintableText();
-            }
-        }
+        
 
         private string minSpecialText = "";
         public string MinSpecialText
@@ -73,7 +47,7 @@
             }
         }
 
-        public int Step { get; set; }
+        
 
 
         public IntSwitcherControll(string name, string identificator) : base(name, identificator)
@@ -94,18 +68,45 @@
             this.max = max;
 
             Value = value;
-            Step = step;
+            base.step = step;
         }
 
         override public void SwitchLeft()
         {
-            Value -= Step;
+            if (value > min)
+                PerformStep(-1);
             RunActions();
         }
         override public void SwitchRight()
         {
-            Value += Step;
+            if( value < max)
+                PerformStep(1);
             RunActions();
+        }
+
+        override protected void PerformStep(int direction)
+        {
+            
+            if (FastStepTime > 0)
+            {
+                long timeFromLastSwitch = stopwatch.ElapsedMilliseconds;
+                if (timeFromLastSwitch < FastStepTime)
+                {
+                    fastSwitchCounter++;
+                }
+                else
+                {
+                    step = oryginalStep;
+                    fastSwitchCounter = 0;
+                }
+                if (fastSwitchCounter >= FastStepsToMultiply)
+                {
+                    fastSwitchCounter = 0;
+                    step *= FastStepMultiplier;
+                }
+                stopwatch.Restart();
+            }
+            Value += step * direction;
         }
 
         public override void Enter() { return; }

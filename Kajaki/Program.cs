@@ -18,7 +18,7 @@ namespace Kajaki
         static Logo l;
         static void Main(string[] args)
         {
-            Renderer.AsyncFrameLenght = 16;
+            Renderer.AsyncFrameLenght = 100;
             Renderer.WindowSize = new Int2(160, 50);
             Renderer.DebugMode = true;
             /*
@@ -166,16 +166,16 @@ namespace Kajaki
 
     class GameSetup
     {
-        static int[] ships = new int[8];
-        static Int2 mapSize;
-        static Map prepareMap;
-
+        public static int[] ships { get; protected set; } = new int[8];
+        public static int[] shipsOnBoard { get; protected set; } = new int[8];
+        public static Map prepareMap { get; protected set; }
+        public static int TurnTimer { get; protected set; }
         public static bool SetupGame(MenuEvent e)
         {
             e.Menu.Erase();
             GameSetup GS = new GameSetup();
-            prepareMap = new Map(new Int2(10, 10), new Int2());
-            Menu gameMenu = new Menu(new Int2(1, 1), new Int2(30, 45), "Game Setup", Boxes.BoxType.doubled)
+            
+            Menu gameMenu = new Menu(new Int2(1, 1), new Int2(32, 45), "Game Setup", Boxes.BoxType.doubled)
             {
                 VerticalTextWrapping = Menu.Wrapping.wrapping
             };
@@ -185,55 +185,63 @@ namespace Kajaki
             {
                 Max = 600,
                 Min = 0,
-                Step = 10,
+                Step = 1,
                 Value = 0,
-                MinSpecialText = "No timer",
+                MinSpecialText = "∞",
+                FastStepTime = 200
+            });
+            gameMenu.AddControll(new IntSwitcherControll("Total lenght limit", "len_lim")
+            {
+                Max = 1152,
+                Min = 0,
+                Step = 1,
+                Value = 0,
+                MinSpecialText = "∞",
+                FastStepTime = 200
+
             });
             gameMenu.AddControll(new IntSwitcherControll("Collision distance", "col_dist")
             {
                 Value = 1,
                 Min = 0,
-                Max = 16,
+                Max = 32,
                 Step = 1,
-            });
+                FastStepTime = 200
+            }, CollisionDistanceChanges);
             gameMenu.AddControll(new CheckBoxControll("Corner collisions", "cor_coll", true)
             {
                 TrueValue = "■",
                 FalseValue = " "
-            });
+            }, CollisionChanges);
 
             gameMenu.AddControll(new LineSeparatorControll("sep1", "sep1"));
             gameMenu.AddControll(new LabelControll("- Board -", "board_label"));
             
-            gameMenu.AddControll(new IntSwitcherControll("Board width", "width", 10, 4, 50, 1));
-            gameMenu.GetControll("width").AddAction(MapSwitcherChanged);
-            gameMenu.AddControll(new IntSwitcherControll("Board height", "height", 10, 4, 40, 1));
-            gameMenu.GetControll("height").AddAction(MapSwitcherChanged);
+            gameMenu.AddControll(new IntSwitcherControll("Board width", "width", 10, 4, 50, 1), MapSwitcherChanged);
+            gameMenu.AddControll(new IntSwitcherControll("Board height", "height", 10, 4, 40, 1), MapSwitcherChanged);
 
             gameMenu.AddControll(new LineSeparatorControll("sep2", "sep2"));
             gameMenu.AddControll(new LabelControll("- Ships -", "ships_label"));
 
             for(int i = 0; i < 8; i++)
             {
-                gameMenu.AddControll(new IntSwitcherControll($"Lenght {i+1}", $"{i+1}len", Arit.Clamp(4 - i, 0, 8), 0, 32, 1));
-                gameMenu.GetControll($"{i+1}len").AddAction(ShipCountChanged);
+                gameMenu.AddControll(new IntSwitcherControll($"Lenght {i+1}", $"{i+1}len", Arit.Clamp(4 - i, 0, 8), 0, 32, 1), ShipCountChanged);
                 ships[i] = Arit.Clamp(4 - i, 0, 8);
+                shipsOnBoard[i] = 0;
             }
-            gameMenu.AddControll(new MenuControll("TEST", "test"));
-            gameMenu.GetControll("test").AddAction(TESTING);
+
             gameMenu.AddControll(new LineSeparatorControll("sep3", "sep3"));
-            gameMenu.AddControll(new MenuControll("◊ START THE GAME ◊", "start"));
+            gameMenu.AddControll(new MenuControll("◊ START THE GAME ◊", "start"), ShipSetup);
+
             gameMenu.AddControll(new LineSeparatorControll("sep4", "sep4"));
-            gameMenu.AddControll(new MenuControll("Go back", "exit"));
-            gameMenu.GetControll("exit").AddAction(gameMenu.Exit);
+            gameMenu.AddControll(new MenuControll("Go back", "exit"), gameMenu.Exit);
 
             gameMenu.AddControll(new LineSeparatorControll("sep_fin", "sep_fin"));
 
-            prepareMap = new Map(new Int2(10, 10), new Int2(35, 1));
+            prepareMap = new Map(new Int2(10, 10), new Int2(34, 1));
             prepareMap.Draw();
 
             DrawShips();
-
             gameMenu.WaitForInput();
 
             EraseShips();
@@ -243,13 +251,25 @@ namespace Kajaki
         }
 
 
-        public static bool TESTING(MenuEvent e)
+        public static bool CollisionChanges(MenuEvent e)
         {
-            for(int i = 0; i < 1; i++)
-            {
-                prepareMap.Draw();
-            }
+            CheckBoxControll c = (CheckBoxControll)((MenuControllEvent)e).Controll;
+            prepareMap.DiagonalCollisions = c.Value == 1;
 
+            prepareMap.Draw();
+            return true;
+        }
+
+        public static bool CollisionDistanceChanges(MenuEvent e)
+        {
+            prepareMap.CollisionDistance = ((MenuControllEvent)e).Controll.GetValue();
+            prepareMap.Draw();
+            return true;
+        }
+
+        public static bool TurnTimerChanges(MenuEvent e)
+        {
+            TurnTimer = ((MenuControllEvent)e).Controll.GetValue();
             return true;
         }
 
@@ -274,7 +294,6 @@ namespace Kajaki
             EraseShips();
             prepareMap.ContentSize = newSize;
             prepareMap.Draw();
-            mapSize = new Int2(prepareMap.Size.x, prepareMap.Size.y);
             DrawShips();
             return true;
         }
@@ -325,196 +344,271 @@ namespace Kajaki
         }
 
 
-        public static bool ShipSetup(MenuEvent e)
+        public static bool PutDownShip(MenuEvent e)
         {
-            e.Menu.Erase();
-            ConsoleKey response;
-            TextBox tb = new TextBox(new Int2(1, 1), new Int2(32, 6), "Info", Boxes.BoxType.doubled);
-            tb.Text = "WSAD/Arrows - cursor movement\nR - Rotate ship\nENTER - select/accept\nESCAPE - go back";
 
-            Menu shipMenu = new Menu(new Int2(1, 8), new Int2(32, 10), "Ships", Boxes.BoxType.doubled);
-
-
-            tb.Draw();
+            MenuControllEvent ce = (MenuControllEvent)e;
+            TextLine comm = new TextLine(new Int2(), "", true);
+            string id = ce.Controll.Identificator;
+            Renderer.Write(id, 0, 20);
+            id = id.Replace("len", "");
+            int len;
+            bool done = false;
+            bool save = false;
+            if (!int.TryParse(id, out len))
+                return false; ;
+            Ship s = prepareMap.AddShip(len, new Int2(0,0));
+            s.PickUp();
+            prepareMap.GenerateCollisionsMap();
+            s.UpdateCollisionState();
             Int2 cursorPosition = new Int2();
-            int hPoint = 0;
-            bool boardFocus = false;
-            prepareMap.Position = new Int2(34, 1);
-            prepareMap.Draw();
+            bool wereColliding = false;
+            bool writeCommunicate = false;
+            string comunicate = "";
+            Int2 communicatePosition = new Int2();
+            ConsoleKey response;
             do
             {
-
+                prepareMap.GenerateCollisionsMap();
+                if (s.Collision == Ship.CollisionState.overlap)
+                {
+                    wereColliding = true;
+                    writeCommunicate = true;
+                    comunicate = " SHIPS ARE OVERLAPPING! ";
+                    communicatePosition = new Int2(prepareMap.Position.x + prepareMap.Size.x - comunicate.Length / 2, prepareMap.Size.y + 1);
+                    comunicate = comunicate.Pastel(Color.Red);
+                }
+                else if (s.Collision == Ship.CollisionState.zone)
+                {
+                    wereColliding = true;
+                    writeCommunicate = true;
+                    comunicate = "SHIP IN COLLISION ZONE! ";
+                    communicatePosition = new Int2(prepareMap.Position.x + prepareMap.Size.x - comunicate.Length / 2, prepareMap.Size.y + 1);
+                    comunicate = comunicate.Pastel(Color.DarkRed);
+                }
+                else
+                {
+                    if(wereColliding)
+                    {
+                        wereColliding = false;
+                        writeCommunicate = true;
+                        comunicate = "                        ";
+                        communicatePosition = new Int2(prepareMap.Position.x + prepareMap.Size.x - comunicate.Length / 2, prepareMap.Size.y + 1);
+                    }
+                }
+                if (writeCommunicate)
+                {
+                    Renderer.Write(comunicate, communicatePosition);
+                    writeCommunicate = false;
+                }
+                prepareMap.Draw();
                 response = Console.ReadKey(true).Key;
 
                 switch (response)
                 {
                     case ConsoleKey.A:
                     case ConsoleKey.LeftArrow:
-                        if (boardFocus)
-                        {
-                            cursorPosition.x--;
-                        }
+                        s.MoveBy(Int2.Left);
                         break;
                     case ConsoleKey.W:
                     case ConsoleKey.UpArrow:
-                        if (boardFocus)
-                        {
-                            cursorPosition.y--;
-                        }
-                        else
-                        {
-                            hPoint--;
-                        }
+                        s.MoveBy(Int2.Down);
                         break;
                     case ConsoleKey.D:
                     case ConsoleKey.RightArrow:
-                        if (boardFocus)
-                        {
-                            cursorPosition.x++;
-                        }
+                        s.MoveBy(Int2.Right);
                         break;
                     case ConsoleKey.S:
                     case ConsoleKey.DownArrow:
-                        if (boardFocus)
-                        {
-                            cursorPosition.y++;
-                        }
-                        else
-                        {
-                            hPoint++;
-                        }
+                        s.MoveBy(Int2.Up);
                         break;
                     case ConsoleKey.Enter:
-                        if (boardFocus)
-                        {
-
-                        }
-                        else
-                        {
-
-                        }
+                        done = true;
+                        break;
+                    case ConsoleKey.Escape:
+                        done = true;
+                        s.Delete();
+                        s = null;
                         break;
                     case ConsoleKey.R:
-                        if (!boardFocus)
-                            break;
+                        s.RotateShip();
+                        prepareMap.Draw();
                         break;
                 }
+                
+                if(s != null && s.Collision != Ship.CollisionState.none)
+                {
+                    done = false;
+                }
+                
 
-            } while (response != ConsoleKey.Escape);
-            tb.Erase();
-
-            prepareMap.Erase();
-
-            e.Menu.Draw();
-            return true;
+            } while (!done);
+            if(s != null)
+                s.PutDown();
+            prepareMap.GenerateCollisionsMap();
+            prepareMap.Draw();
+            Renderer.AddDissapearingText("Added new ship", 1000, new Int2(40, 0));
+            return save;
         }
 
-        static void PrintSetup()
+        public static bool ShipSetup(MenuEvent e)
         {
-            Boxes.DrawBox(Boxes.BoxType.doubled, 1, 17, 30, 30);
+            EraseShips();
+            e.Menu.Erase();
+            
+            prepareMap.Erase();
+
+            Menu boardMenu = new Menu(new Int2(1, 1), new Int2(32, 45), "Board Setup", Boxes.BoxType.doubled)
+            {
+                VerticalTextWrapping = Menu.Wrapping.wrapping
+            };
+
+            boardMenu.AddControll(new LineSeparatorControll("sep0", "sep0"));
+            boardMenu.AddControll(new LabelControll("- Select ship -", "ship_label"));
+            for (int i = 0; i < ships.Length; i++)
+            {
+                if(ships[i] > 0)
+                boardMenu.AddControll(new MenuControll($"Lenght {i+1} - {shipsOnBoard[i]}/{ships[i]} on board", $"len{i+1}"), PutDownShip);
+            }
+
+            boardMenu.AddControll(new LineSeparatorControll("sep4", "sep4"));
+            boardMenu.AddControll(new MenuControll("Go back", "exit"), boardMenu.Exit);
+
+            boardMenu.AddControll(new LineSeparatorControll("sep_fin", "sep_fin"));
+
+            prepareMap.ShowCollisions = true;
+            prepareMap.Draw();
+
+            boardMenu.WaitForInput();
+
+            prepareMap.Erase();
+            prepareMap.ShowCollisions = false;
+            e.Menu.Draw();
+            DrawShips();
+            prepareMap.Draw();
+            return true;
         }
     }
 
-
-    
-
-
-    
-
-
-    
-
-
-    class TextBox
+    class ShipSetup
     {
-        public Int2 Position { get; protected set; }
+        public static Map PrepareMap { get; set; }
+
+    }
+    
+
+
+    
+
+
+    
+
+
+    class TextLine
+    {
+        protected Stringer.TextAlignment alignment;
+        public Stringer.TextAlignment Alignment
+        {
+            get
+            {
+                return alignment;
+            }
+            set
+            {
+                if (alignment == value)
+                    return;
+                alignment = value;
+                Refresh();
+            }
+        }
+        Int2 position;
+        public Int2 Position { get
+            {
+                return position;
+            }
+            set
+            {
+                if (value == position)
+                    return;
+                Hide();
+                position = value;
+                Show();
+            }
+        }
         public Int2 Size { get; protected set; }
-        protected string name;
-        public string Name
-        {
-            get
-            {
-                return name;
-            }
-            set
-            {
-                name = value;
+        protected Color backgroundColor;
+        protected Color textColor;
 
-                if(IsVIsable)
-                {
-                    Draw();
-                }
 
-            }
-        }
-        protected string text;
-        public string Text
-        {
-            get
-            {
-                return text;
-            }
-            set
-            {
-                text = value;
-                FormatText();
-                DrawText();
-            }
-        }
-        protected string[] textLines;
-        Boxes.BoxType boxType;
-        string emptyLine;
+        protected string emptyLine;
+        protected string previousText;
+        public string Text { get; protected set; }
         public bool IsVIsable { get; protected set; }
-        public TextBox(Int2 position, Int2 size, string name, Boxes.BoxType boxType)
+
+        public TextLine(Int2 position, string text, bool visable)
         {
-            Position = position;
-            Size = size;
-            Name = name;
-            emptyLine = Stringer.GetFilledString(size.x - 2, ' ');
-            this.boxType = boxType;
+            this.position = position;
+            previousText = "";
+            IsVIsable = false;
+            UpdateText(text);
         }
 
-        public void Append(string str)
+        public void SetText(string text)
         {
-            Text = Text + '\n' + str;
+            SetText(text, textColor, backgroundColor);
+        }
+        public void SetText(string text, Color textColor, Color backgroundColor)
+        {
+            
+            this.textColor = textColor;
+            this.backgroundColor = backgroundColor;
+            UpdateText(text);
         }
 
-        public void Draw()
+        public void SetColor(Color textColor, Color backgroundColor)
         {
-            IsVIsable = true;
-            Console.ForegroundColor = ConsoleColor.White;
-            Boxes.DrawBox(boxType, Position.x, Position.y, Size.x, Size.y);
-            Renderer.Write(Name, Position.x + (Size.x - Name.Length) / 2, Position.y);
-            DrawText();
+            this.textColor = textColor;
+            this.backgroundColor = backgroundColor;
+            UpdateText(Text);
         }
 
-        protected void FormatText()
+        void UpdateText(string newText)
         {
-            textLines = text.Split('\n');
-            for(int y = 0; y < textLines.Length; y++)
-            {
-                textLines[y] = textLines[y].Substring(0, Arit.TakeLower(Size.x - 2, textLines[y].Length));
-            }
+
+            previousText = Text;
+            Text = newText;
+            if (IsVIsable)
+                Renderer.Write(emptyLine, Position);
+            emptyLine = Stringer.GetFilledString(newText.Length, ' ');
+            Size = new Int2(Text.Length, 1);
+            Refresh();
         }
 
-        protected void DrawText()
-        {
-            for (int y = 0; y < Size.y - 2; y++)
-            {
-                Renderer.Write(textLines[y], Position.x + 1, Position.y + 1 + y);
-            }
-        }
-        public void Erase()
+
+
+        public void Show()
         {
             IsVIsable = false;
-            string fullEmptyLine = emptyLine + "  ";
+            Refresh();
+        }
 
-            for(int y = 0; y < Size.y; y++)
+        void Refresh()
+        {//Problemy z kolorami w alignmencie, bo pastel itd... zrobić align lokalny albo w stringerze z pastelem
+            if (IsVIsable)
             {
-                Renderer.Write(fullEmptyLine, Position.x, Position.y + y);
+                //Renderer.Write(Stringer.AlighnString(Text).Pastel(textColor).PastelBg(backgroundColor), position);
             }
-            
+        }
 
+        void Erase()
+        {
+
+        }
+
+        public void Hide()
+        {
+            IsVIsable = false;
+                Renderer.Write(emptyLine, Position);
         }
     }
 

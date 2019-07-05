@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
-using System.Threading.Tasks;
+using System.Diagnostics;
 
 namespace Kajaki
 {
@@ -13,7 +13,7 @@ namespace Kajaki
         protected string RAS;
         protected string LNS;
         protected string RNS;
-
+        
         public string LeftAvlaiableSymbol
         {
             get
@@ -66,7 +66,56 @@ namespace Kajaki
             }
         }
 
+        protected int fastSwitchCounter;
+        public int FastStepTime { get; set; }
+        public int FastStepMultiplier { get; set; }
+        public int FastStepsToMultiply { get; set; }
 
+
+        protected int oryginalStep;
+        protected int step;
+        public int Step
+        {
+            get
+            {
+                return step;
+            }
+            set
+            {
+                step = value;
+                oryginalStep = step;
+            }
+        }
+
+        protected int min = 0;
+        public int Min
+        {
+            get
+            {
+                return min;
+            }
+            set
+            {
+                this.min = Arit.Clamp(value, int.MinValue, max);
+                SetPrintableText();
+            }
+        }
+
+        protected int max = 10;
+        public int Max
+        {
+            get
+            {
+                return max;
+            }
+            set
+            {
+                this.max = Arit.Clamp(value, min, int.MaxValue);
+                SetPrintableText();
+            }
+        }
+
+        protected Stopwatch stopwatch;
 
         public SwitcherControll(string name, string identificator) : base(name, identificator)
         {
@@ -74,7 +123,15 @@ namespace Kajaki
             RAS = "►";
             LNS = " ";
             RNS = " ";
+            fastSwitchCounter = 0;
+            FastStepTime = 0;
+            FastStepMultiplier = 10;
+            FastStepsToMultiply = 10;
+            stopwatch = new Stopwatch();
+            stopwatch.Start();
         }
+
+        abstract protected void PerformStep(int direction);
 
         abstract protected void SetPrintableText();
     }

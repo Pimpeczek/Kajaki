@@ -14,6 +14,7 @@ namespace Kajaki
         public enum VerticalTextAlignment { upper, middle, lower }
         static Int2 windowSize;
         static int debugLines = 0;
+
         public static Int2 WindowSize
         {
             get { return windowSize; }
@@ -116,9 +117,12 @@ namespace Kajaki
             }
         }
 
+        static List<TimedTextRequest> timedTextRequests;
+
         static Renderer()
         {
             Console.OutputEncoding = Encoding.UTF8;
+            timedTextRequests = new List<TimedTextRequest>();
             Console.CursorVisible = false;
             AsyncMode = true;
             requestPointer = 0;
@@ -172,6 +176,8 @@ namespace Kajaki
             }
             AsyncWrite($"Frame: {$"{frame}".PadLeft(8)}".Pastel(Color.DarkViolet).PastelBg(Color.LightGray), windowSize.x - 16, 0);
             lastSleepTime = sleepTime;
+            AgeTimedTextRequests(elapsedTime + sleepTime);
+            
             Thread.Sleep(Arit.Clamp(sleepTime, 0, asyncFrameLenght));
         }
 
@@ -182,6 +188,7 @@ namespace Kajaki
             {
                 Write((RenderRequest)requests.Dequeue());
             }
+            AgeTimedTextRequests((int)stopwatch.ElapsedMilliseconds);
             Thread.Sleep(Arit.Clamp(asyncFrameLenght - (int)stopwatch.ElapsedMilliseconds, 0, asyncFrameLenght));
         }
 
@@ -231,7 +238,7 @@ namespace Kajaki
         }
         public static void Write(string text, int x, int y)
         {
-            if(AsyncMode)
+            if (AsyncMode)
             {
                 requests.Enqueue(new RenderRequest(text, x, y));
                 return;
@@ -243,6 +250,22 @@ namespace Kajaki
             Console.SetCursorPosition(x, y);
             Console.Write(text);
         }
+
+        public static void SyncWrite(string text, Int2 position)
+        {
+            SyncWrite(text, position.x, position.y);
+        }
+
+        public static void SyncWrite(string text, int x, int y)
+        {
+            if (x < 0)
+                x = 0;
+            if (y < 0)
+                y = 0;
+            Console.SetCursorPosition(x, y);
+            Console.Write(text);
+        }
+
         public static void Write(int text, Int2 position)
         {
             Write(text.ToString(), position.x, position.y);
@@ -257,6 +280,30 @@ namespace Kajaki
             return !(pos.x > 0 && pos.x < size.x - 1 && pos.y > 0 && pos.y < size.y - 1);
         }
 
+        public static void AddDissapearingText(string text, int timeOnScreen, Int2 position)
+        {
+            AddDissapearingText(text, "", timeOnScreen, position);
+        }
+
+        public static void AddDissapearingText(string text, string clearingString, int timeOnScreen, Int2 position)
+        {
+            timedTextRequests.Add(new TimedTextRequest(text, clearingString, timeOnScreen, position));
+            Write(text, position);
+        }
+
+        public static void EraseTimedText(TimedTextRequest ttr)
+        {
+            Write(ttr.ClearingString, ttr.Position);
+            timedTextRequests.Remove(ttr);
+        }
+
+        static void AgeTimedTextRequests(int elapsed)
+        {
+            for(int i = 0; i < timedTextRequests.Count; i++)
+            {
+                timedTextRequests[i].Age(elapsed);
+            }
+        }
 
     }
 
@@ -270,6 +317,35 @@ namespace Kajaki
             Text = text;
             X = x;
             Y = y;
+        }
+    }
+
+    class TimedTextRequest
+    {
+        public int lifeTime { get; protected set; }
+        public string Text { get; protected set; }
+        public string ClearingString { get; protected set; }
+        public Int2 Position { get; protected set; }
+        public TimedTextRequest(string text, string clearingString, int lifeTime, Int2 position)
+        {
+            Position = position;
+            Text = text;
+            if (clearingString.Length < text.Length)
+            {
+                clearingString = clearingString.PadRight(text.Length - clearingString.Length, ' ');
+            }
+            ClearingString = clearingString;
+            this.lifeTime = lifeTime;
+        }
+
+        public void Age(int time)
+        {
+            lifeTime -= time;
+            Renderer.Write(lifeTime.ToString() + " " + time.ToString(),0, 25);
+            if(lifeTime <= 0)
+            {
+                Renderer.EraseTimedText(this);
+            }
         }
     }
 }

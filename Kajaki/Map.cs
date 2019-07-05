@@ -1,6 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Linq;
+using System.Threading;
 using System.Drawing;
 using Pastel;
 
@@ -40,8 +40,9 @@ namespace Kajaki
                 EraseBorders(value);
                 size = new Int2(Arit.Clamp(value.x, 1, int.MaxValue), Arit.Clamp(value.y, 1, int.MaxValue));
                 contentSize = new Int2(size.x - 2, contentSize.y - 2);
+                CollisionMap = new int[contentSize.x, contentSize.y];
                 SetupLines();
-
+                GenerateCollisionsMap();
             }
         }
         Int2 contentSize = new Int2(10, 10);
@@ -56,11 +57,50 @@ namespace Kajaki
                 EraseBorders(value);
                 contentSize = new Int2(Arit.Clamp(value.x, 1, int.MaxValue), Arit.Clamp(value.y, 1, int.MaxValue));
                 size = new Int2(contentSize.x + 2, contentSize.y + 2);
+                CollisionMap = new int[contentSize.x, contentSize.y];
                 SetupLines();
-
+                GenerateCollisionsMap();
             }
         }
-        public List<Ship> ships;
+
+        public int[,] CollisionMap { get; protected set; }
+        bool diagonalCollisions;
+        public bool DiagonalCollisions
+        {
+            get
+            {
+                return diagonalCollisions;
+            }
+            set
+            {
+                if (value == diagonalCollisions)
+                {
+                    return;
+                }
+                diagonalCollisions = value;
+                GenerateCollisionsMap();
+            }
+        }
+        int collisionDistance;
+        public int CollisionDistance
+        {
+            get
+            {
+                return collisionDistance;
+            }
+            set
+            {
+                if (value == collisionDistance)
+                {
+                    return;
+                }
+                collisionDistance = value;
+                GenerateCollisionsMap();
+            }
+        }
+        public bool ShowCollisions { get; set; }
+        int maxDistance;
+        public List<Ship> Ships { get; protected set; }
         Int2 contentPosition;
         public string waterLane;
         string upBorder;
@@ -70,11 +110,16 @@ namespace Kajaki
         int frame;
         public bool IsVisable { get; protected set; }
 
+        bool flag_redrawWater;
+
         public Map(Int2 contentSize, Int2 position)
         {
-            ships = new List<Ship>();
+            flag_redrawWater = true;
+            diagonalCollisions = true;
+            collisionDistance = 1;
+            Ships = new List<Ship>();
             Position = position;
-            contentPosition = new Int2(Position.x + 1, Position.y + 1);
+            contentPosition = new Int2(Position.x + 2, Position.y + 1);
             ContentSize = contentSize;
             frame = 0;
 
@@ -122,13 +167,96 @@ namespace Kajaki
         {
             IsVisable = true;
             DrawMapRaw();
+            
+            if(ShowCollisions)
+                DrawCollisions();
+            DrawShips();
+        }
 
-            for (int i = 0; i < ships.Count; i++)
+        public void DrawShips()
+        {
+            Color shipColor;
+            string shipSymbol, editedShipSymbol;
+            Ship s;
+            Deck d;
+            for (int i = 0; i < Ships.Count; i++)
             {
-                for (int j = 0; i < ships[i].decks.Length; j++)
+                s = Ships[i];
+                shipSymbol = (Ships[i].BoardState == Ship.OnBoardState.putDown ? "██" : "▒▒");
+                
+                for (int j = 0; j < s.Decks.Length; j++)
                 {
-                    Renderer.Write("██", ships[i].decks[j].position.x * 2 + contentPosition.x, ships[i].decks[j].position.y + contentPosition.y);
+                    d = s.Decks[j];
+                    if (IsTileOccupied(d.Position, s.Id))
+                    {
+                        editedShipSymbol = shipSymbol.PastelBg(Color.Red).Pastel(Color.White);
+                    }
+                    else if(IsTileColliding(d.Position))
+                    {
+                        editedShipSymbol = shipSymbol.PastelBg(Color.DarkRed).Pastel(Color.White);
+                    }
+                    else
+                    {
+                        editedShipSymbol = shipSymbol;
+                    }
+                    Renderer.Write(editedShipSymbol, Ships[i].Decks[j].Position.x * 2 + contentPosition.x, Ships[i].Decks[j].Position.y + contentPosition.y);
                 }
+            }
+        }
+
+        bool IsTileOccupied(Int2 position)
+        {
+            for (int s = 0; s < Ships.Count; s++)
+            {
+                if (Ships[s].TryHit(position))
+                    return true;
+            }
+            return false;
+        }
+
+        public bool IsTileOccupied(Int2 position, int id)
+        {
+            for (int s = 0; s < Ships.Count; s++)
+            {
+                if (Ships[s].Id != id && Ships[s].TryHit(position))
+                    return true;
+            }
+            return false;
+        }
+
+        public bool IsTileColliding(Int2 position)
+        {
+            return CollisionMap[position.x, position.y] <= collisionDistance;
+        }
+
+        void DrawCollisions()
+        {
+            string mapLine;
+            float max = contentSize.x + contentSize.y;
+            for (int y = 0; y < contentSize.y; y++)
+            {
+                mapLine = "";
+                for (int x = 0; x < contentSize.x; x++)
+                {
+                    mapLine += "▒▒".Pastel((CollisionMap[x, y] > collisionDistance ? Color.Green : Color.Red)).PastelBg(Color.Black);
+                }
+                Renderer.Write(mapLine, contentPosition.x, contentPosition.y + y);
+            }
+        }
+
+        void DrawDistances()
+        {
+            string mapLine;
+            float max = contentSize.x + contentSize.y;
+            Color dargDarkGray = Color.FromArgb(16, 16, 16);
+            for (int y = 0; y < contentSize.y; y++)
+            {
+                mapLine = "";
+                for (int x = 0; x < contentSize.x; x++)
+                {
+                    mapLine += CollisionMap[x, y].ToString().PadLeft(2, ' ').Pastel((CollisionMap[x, y] > collisionDistance ? Color.Green : Color.Red)).PastelBg(((x + y) % 2 == 0 ? Color.Black : dargDarkGray));
+                }
+                Renderer.Write(mapLine, contentPosition.x, contentPosition.y + y);
             }
         }
 
@@ -151,47 +279,234 @@ namespace Kajaki
             }
         }
 
+        public Ship AddShip(int lenght, Int2 position)
+        {
+            Ship s = new Ship(lenght, position, this, DateTime.Now.Millisecond);
+            Ships.Add(s);
+            GenerateCollisionsMap();
+            return s;
+        }
 
+        public void RemoveShip(Ship ship)
+        {
+            Ships.Remove(ship);
+            ship = null;
+            GenerateCollisionsMap();
+        }
+
+        public void GenerateCollisionsMap()
+        {
+
+            Loops.ForLoop(contentSize.x, contentSize.y, ResetDistanceAtPoint);
+            for (int i = 0; i < Ships.Count; i++)
+            {
+                GenerateShipCollisions(Ships[i]);
+            }
+        }
+
+        bool ResetDistanceAtPoint(int x, int y)
+        {
+            CollisionMap[x, y] = contentSize.x + contentSize.y;
+            return true;
+        }
+
+        void GenerateShipCollisions(Ship ship)
+        {
+            if (ship.BoardState == Ship.OnBoardState.pickedUp)
+                return;
+            for(int i = 0; i < ship.Decks.Length; i++)
+            {
+                WalkFromPoint(ship.Decks[i].Position, 0, contentSize.x + contentSize.y);
+            }
+        }
+
+        void WalkFromPoint(Int2 point, int distance, int energy)
+        {
+            
+            
+            if (energy < 0)
+                return;
+
+            if (!Int2.InBox(contentSize - Int2.One, point))
+                return;
+            if (distance >= CollisionMap[point.x, point.y])
+            {
+                return;
+            }
+            CollisionMap[point.x, point.y] = distance;
+            if (distance > maxDistance)
+                maxDistance = distance;
+            if (diagonalCollisions)
+            {
+                WalkFromPoint(point + Int2.Up + Int2.Right, distance + 1, energy - 1);
+                WalkFromPoint(point + Int2.Down + Int2.Right, distance + 1, energy - 1);
+                WalkFromPoint(point + Int2.Up + Int2.Left, distance + 1, energy - 1);
+                WalkFromPoint(point + Int2.Down + Int2.Left, distance + 1, energy - 1);
+            }
+            WalkFromPoint(point + Int2.Up, distance + 1, energy - 1);
+            WalkFromPoint(point + Int2.Right, distance + 1, energy - 1);
+            WalkFromPoint(point + Int2.Down, distance + 1, energy - 1);
+            WalkFromPoint(point + Int2.Left, distance + 1, energy - 1);
+
+            return;
+        }
     }
+
+
 
     class Deck
     {
-        public Int2 position;
-        public Ship ship;
-        public Ship.ShipState deckState;
+        public Int2 Position;
+        public Ship Ship { get; protected set; }
+        public Ship.ShipState State { get; protected set; }
+
+        public Deck(Int2 position)
+        {
+            Position = position;
+            State = Ship.ShipState.fine;
+        }
 
         public void Hit()
         {
-            deckState = Ship.ShipState.hit;
-            ship.Hit();
+            State = Ship.ShipState.hit;
+            Ship.Hit();
         }
 
         public void Sunk()
         {
-            deckState = Ship.ShipState.sunk;
+            State = Ship.ShipState.sunk;
         }
 
     }
 
     class Ship
     {
-        public enum ShipState { fine, hit, sunk };
-        public int id;
-        public Deck[] decks;
-        public ShipState shipState;
+        public enum ShipState { fine, hit, sunk};
+        public enum OnBoardState {putDown, pickedUp}
+        public enum CollisionState { none, zone, overlap}
+        public int Id { get; protected set; }
+        public int lenght;
+        public Deck[] Decks { get; protected set; }
+        public ShipState State { get; protected set; }
+        public OnBoardState BoardState { get; protected set; }
+        public CollisionState Collision { get; set; }
         public int hits;
+        Int2 leftUpCorner;
+        Int2 rightDownCorner;
+        public Map MyMap { get; protected set; }
+
+        public Ship(int shipLenght, Int2 position, Map myMap, int id)
+        {
+            Decks = new Deck[shipLenght];
+            MyMap = myMap;
+            Id = id;
+            lenght = shipLenght;
+            leftUpCorner = position;
+            Int2 tPos = new Int2(leftUpCorner.x, leftUpCorner.y);
+            for (int i = 0; i < shipLenght; i++)
+            {
+                Decks[i] = new Deck(tPos);
+                rightDownCorner = tPos;
+                tPos = new Int2(tPos.x + 1, tPos.y);
+            }
+            
+
+        }
+
+        public void PickUp()
+        {
+            BoardState = OnBoardState.pickedUp;
+        }
+
+        public void PutDown()
+        {
+            BoardState = OnBoardState.putDown;
+        }
+
+        public void Delete()
+        {
+            if (MyMap == null)
+                return;
+            MyMap.RemoveShip(this);
+        }
+
+        public bool MoveBy(Int2 delta)
+        {
+            if (!Int2.InBox(MyMap.ContentSize - Int2.One, leftUpCorner + delta) || !Int2.InBox(MyMap.ContentSize - Int2.One, rightDownCorner + delta))
+            {
+                return false;
+            }
+
+
+            for(int i = 0; i < lenght; i++)
+            {
+                Decks[i].Position += delta;
+            }
+            leftUpCorner += delta;
+            rightDownCorner += delta;
+            UpdateCollisionState();
+
+            return true;
+        }
+
+        public void UpdateCollisionState()
+        {
+            Collision = CollisionState.none;
+            for (int i = 0; i < lenght; i++)
+            {
+                if(MyMap.IsTileOccupied(Decks[i].Position, Id))
+                {
+                    Collision = CollisionState.overlap;
+                    break;
+                }
+                if (MyMap.IsTileColliding(Decks[i].Position))
+                {
+                    Collision = CollisionState.zone;
+                    break;
+                }
+            }
+        }
+
+        public void RotateShip()
+        {
+            if (!Int2.InBox(MyMap.ContentSize - Int2.One, leftUpCorner + (rightDownCorner - leftUpCorner).Flipped()))
+                return;
+            for (int i = 0; i < Decks.Length; i++)
+            {
+                Decks[i].Position = Decks[i].Position - leftUpCorner;
+                Decks[i].Position.Flip();
+                Decks[i].Position = Decks[i].Position + leftUpCorner;
+                rightDownCorner = Decks[lenght-1].Position;
+            }
+            UpdateCollisionState();
+        }
+
+        public bool TryHit(Int2 position)
+        {
+            for (int i = 0; i < lenght; i++)
+            {
+                if (Decks[i].Position == position)
+                    return true;
+            }
+
+            return false;
+        }
+
 
         public void Hit()
         {
             hits++;
-            if (hits == decks.Length)
+            if (hits == Decks.Length)
             {
-                for (int i = 0; i < decks.Length; i++)
+                for (int i = 0; i < Decks.Length; i++)
                 {
-                    decks[i].Sunk();
+                    Decks[i].Sunk();
                 }
             }
-            shipState = ShipState.sunk;
+            State = ShipState.sunk;
         }
+
+        
+
     }
 }

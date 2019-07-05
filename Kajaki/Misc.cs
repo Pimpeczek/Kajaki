@@ -27,14 +27,87 @@ namespace Kajaki
         }
     }
 
+    class Loops
+    {
+        public static void ForLoop(int xTimes, Func<int, bool> func)
+        {
+            for (int x = 0; x < xTimes; x++)
+                if (!func.Invoke(x))
+                    break;
+        }
+
+        public static void ForLoop(int xTimes, int yTimes, Func<int, int, bool> func)
+        {
+            bool repeat = true;
+            for (int x = 0; repeat && x < xTimes; x++)
+            {
+                for (int y = 0; repeat && y < yTimes; y++)
+                {
+                    repeat = func.Invoke(x, y);
+                }
+            }
+        }
+
+        public static void ForLoop(int xTimes, int yTimes, int zTimes, Func<int, int, int, bool> func)
+        {
+            bool repeat = true;
+            for (int x = 0; repeat && x < xTimes; x++)
+            {
+                for (int y = 0; repeat && y < yTimes; y++)
+                {
+                    for (int z = 0; repeat && z < zTimes; z++)
+                    {
+                        repeat = func.Invoke(x, y, z);
+                    }
+                }
+            }
+        }
+    }
+
     class Stringer
     {
+        public enum TextAlignment { Left, Middle, Right, Wrapp}
         public static int CountChars(string str, char ch)
         {
             int count = 0;
             foreach (char c in str)
                 if (c == ch) count++;
             return count;
+        }
+        public static string AlighnString(string str, int len, TextAlignment alignment)
+        {
+            if (len <= str.Length)
+                return str;
+            switch(alignment)
+            {
+                case TextAlignment.Left:
+                    str = str + GetFilledString(len - str.Length, ' ');
+                    break;
+                case TextAlignment.Middle:
+                    str = str + GetFilledString((len - str.Length)/2, ' ');
+                    str = GetFilledString(len - str.Length, ' ') + str;
+                    break;
+                case TextAlignment.Right:
+                    str = GetFilledString(len - str.Length, ' ');
+                    break;
+            }
+            return str;
+        }
+        public static string FillToLenght(string str, int len, char c)
+        {
+            if (str.Length < len)
+            {
+                return str + GetFilledString(len - str.Length, c);
+            }
+            return str;
+        }
+        public static string FillToLenght(string str, int len, string pattern)
+        {
+            if (str.Length < len)
+            {
+                return str + GetFilledString(len - str.Length, pattern);
+            }
+            return str;
         }
 
         public static string GetFilledString(int len, char character)
@@ -58,6 +131,15 @@ namespace Kajaki
     class Arit
     {
         public static int Clamp(int value, int inclusiveMin, int inclusiveMax)
+        {
+            if (value < inclusiveMin)
+                return inclusiveMin;
+            if (value > inclusiveMax)
+                return inclusiveMax;
+            return value;
+        }
+
+        public static float Clamp(float value, float inclusiveMin, float inclusiveMax)
         {
             if (value < inclusiveMin)
                 return inclusiveMin;
@@ -158,9 +240,12 @@ namespace Kajaki
     public class Int2
     {
         public int x, y;
-        public static Int2 zero = new Int2(0, 0);
-        public static Int2 one = new Int2(1, 1);
-
+        public static Int2 Zero { get; } = new Int2(0, 0);
+        public static Int2 One { get; } = new Int2(1, 1);
+        public static Int2 Up { get; } = new Int2(0, 1);
+        public static Int2 Right { get; } = new Int2(1, 0);
+        public static Int2 Down { get; } = new Int2(0, -1);
+        public static Int2 Left { get; } = new Int2(-1, 0);
         public Int2()
         {
             x = 0;
@@ -170,6 +255,26 @@ namespace Kajaki
         {
             x = _x; y = _y;
         }
+
+        ///<summary>
+        ///Swaps values of x and y in instance of the object.
+        ///</summary>
+        public void Flip()
+        {
+            int t = x;
+            x = y;
+            y = t;
+        }
+
+        ///<summary>
+        ///Returns new instance of Int2 with swapped x and y values.
+        ///</summary>
+        public Int2 Flipped()
+        {
+            return new Int2(y, x);
+        }
+
+
 
         override public string ToString()
         {
@@ -197,13 +302,29 @@ namespace Kajaki
             return new Int2(Rand.Int(exclusiveMin.x, exclusiveMax.y), Rand.Int(exclusiveMin.y, exclusiveMax.y));
         }
 
-        public static bool InBox(Int2 aSize, Int2 coords)
+        ///<summary>
+        ///Checks if a point is inside a given box (inclusve version).
+        ///</summary>
+        ///<param name="boxSize">The size of a box.</param>
+        ///<param name="point">The point to be checked.</param>
+        public static bool InBox(Int2 boxSize, Int2 point)
         {
-            return coords <= aSize && coords >= zero;
+            return point <= boxSize && point >= Zero;
         }
-        public static bool InBox(Int2 aSize, Int2 aCoords, Int2 bCoords)
+
+        ///<summary>
+        ///Checks if a point is inside a given box (exclusive version).
+        ///</summary>
+        ///<param name="boxSize">The size of a box.</param>
+        ///<param name="point">The point to be checked.</param>
+        public static bool InBoxEx(Int2 boxSize, Int2 point)
         {
-            return bCoords <= aSize + aCoords && bCoords >= aCoords;
+            return point < boxSize && point > Zero;
+        }
+
+        public static bool InBox(Int2 aSizeInclusive, Int2 aCoords, Int2 bCoords)
+        {
+            return bCoords <= aSizeInclusive + aCoords && bCoords >= aCoords;
         }
         public static bool InBoxInBox(Int2 aSize, Int2 aCoords, Int2 bSize, Int2 bCoords)
         {

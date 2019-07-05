@@ -84,24 +84,35 @@ namespace Kajaki
             this.boxType = boxType;
         }
 
-        
 
-        public void AddControll(MenuControll switcherOption)
+
+        public void AddControll(MenuControll controll, Func<MenuEvent, bool> action)
         {
             for (int i = 0; i < controlls.Count; i++)
             {
-                if (controlls[i].Identificator == switcherOption.Identificator)
+                if (controlls[i].Identificator == controll.Identificator)
                 {
-                    controlls[i] = switcherOption;
+                    controlls[i] = controll;
                     return;
                 }
             }
-            switcherOption.SetParent(this);
-            controlls.Add(switcherOption);
+            controll.SetParent(this);
+            controlls.Add(controll);
+
+            if(action != null)
+            {
+                controll.AddAction(action);
+            }
+
             if (verticalTextWrapping == Wrapping.wrapping)
             {
                 Size = new Int2(Size.x, controlls.Count + 2);
             }
+        }
+
+        public void AddControll(MenuControll controll)
+        {
+            AddControll(controll, null);
         }
 
         public int GetValue(string identificator)
