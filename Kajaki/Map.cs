@@ -102,28 +102,34 @@ namespace Kajaki
         int maxDistance;
         public List<Ship> Ships { get; protected set; }
         Int2 contentPosition;
-        public string waterLane;
         string upBorder;
-        public string[] midBorder;
+        string[] midBorder;
         string downBorder;
+        string waterLine;
         string emptyLine;
-        int frame;
+        string emptyBoardLine;
+
+        Color wavesColor;
+        Color waterColor;
+
         public bool IsVisable { get; protected set; }
-
-        bool flag_redrawWater;
-
+        bool redrawCollision;
+        bool redrawBorders;
+        List<Int2> redrawTileList;
         public Map(Int2 contentSize, Int2 position)
         {
-            flag_redrawWater = true;
             diagonalCollisions = true;
+            redrawCollision = true;
+            redrawBorders = true;
             collisionDistance = 1;
             Ships = new List<Ship>();
             Position = position;
             contentPosition = new Int2(Position.x + 2, Position.y + 1);
             ContentSize = contentSize;
-            frame = 0;
-
-
+            waterColor = Color.FromArgb(16, 16, 32);
+            wavesColor = Color.SteelBlue;
+            redrawTileList = new List<Int2>();
+            SetupLines();
         }
 
         void EraseBorders(Int2 newSize)
@@ -148,8 +154,8 @@ namespace Kajaki
 
         void SetupLines()
         {
-            waterLane = Stringer.GetFilledString(contentSize.x * 2, Bars.transparent[1]);
-            //upBorder = $"█{Misc.GetFilledString(contentSize.x, '█')}█";
+            waterLine = Stringer.GetFilledString(contentSize.x * 2, Bars.transparent[1]).Pastel(wavesColor).PastelBg(waterColor);
+            emptyBoardLine = Stringer.GetFilledString(contentSize.x * 2, ' ');
             upBorder = "██".Pastel(Color.Gold);
             for (int i = 0; i < contentSize.x; i++)
             {
@@ -157,19 +163,36 @@ namespace Kajaki
             }
             upBorder += "██".Pastel(Color.Gold);
             midBorder = new string[2];
-            midBorder[0] = "██".Pastel(Color.Gray) + $"{waterLane.Pastel(Color.SteelBlue)}" + "██".Pastel(Color.Gray);
-            midBorder[1] = "██".Pastel(Color.LightGray) + $"{waterLane.Pastel(Color.SteelBlue)}" + "██".Pastel(Color.LightGray);
+            midBorder[0] = "██".Pastel(Color.Gray) + emptyBoardLine + "██".Pastel(Color.Gray);
+            midBorder[1] = "██".Pastel(Color.LightGray) + emptyBoardLine + "██".Pastel(Color.LightGray);
             emptyLine = Stringer.GetFilledString(size.x * 2, ' ');
             downBorder = (string)upBorder.Clone();
+            redrawBorders = true;
         }
 
         public void Draw()
         {
             IsVisable = true;
-            DrawMapRaw();
-            
-            if(ShowCollisions)
-                DrawCollisions();
+            if (redrawBorders)
+            {
+                DrawMapRaw();
+            }
+
+            if (ShowCollisions)
+            {
+                if (redrawCollision)
+                {
+                    DrawCollisions();
+                }
+                else
+                {
+                    UpdateCollisions();
+                }
+            }
+            else
+            {
+                DrawWater();
+            }
             DrawShips();
         }
 
@@ -183,7 +206,7 @@ namespace Kajaki
             {
                 s = Ships[i];
                 shipSymbol = (Ships[i].BoardState == Ship.OnBoardState.putDown ? "██" : "▒▒");
-                
+
                 for (int j = 0; j < s.Decks.Length; j++)
                 {
                     d = s.Decks[j];
@@ -191,7 +214,7 @@ namespace Kajaki
                     {
                         editedShipSymbol = shipSymbol.PastelBg(Color.Red).Pastel(Color.White);
                     }
-                    else if(IsTileColliding(d.Position))
+                    else if (IsTileColliding(d.Position))
                     {
                         editedShipSymbol = shipSymbol.PastelBg(Color.DarkRed).Pastel(Color.White);
                     }
@@ -238,10 +261,32 @@ namespace Kajaki
                 mapLine = "";
                 for (int x = 0; x < contentSize.x; x++)
                 {
-                    mapLine += "▒▒".Pastel((CollisionMap[x, y] > collisionDistance ? Color.Green : Color.Red)).PastelBg(Color.Black);
+                    mapLine += GetCollisionTile(x, y);
                 }
                 Renderer.Write(mapLine, contentPosition.x, contentPosition.y + y);
             }
+            redrawCollision = false;
+        }
+        public void UpdateTiles(Int2[] tilesToUpdate)
+        {
+            redrawTileList.AddRange(tilesToUpdate);
+        }
+        void UpdateCollisions()
+        {
+            for(int i = 0; i < redrawTileList.Count; i++)
+            {
+                Renderer.Write(GetCollisionTile(redrawTileList[i]), redrawTileList[i].x*2 + contentPosition.x, contentPosition.y + redrawTileList[i].y);
+            }
+            redrawTileList.Clear();
+        }
+
+        string GetCollisionTile(Int2 position)
+        {
+            return GetCollisionTile(position.x, position.y);
+        }
+        string GetCollisionTile(int x, int y)
+        {
+            return "▒▒".Pastel((CollisionMap[x, y] > collisionDistance ? Color.Green : Color.Red)).PastelBg(Color.Black);
         }
 
         void DrawDistances()
@@ -267,7 +312,10 @@ namespace Kajaki
             {
                 Renderer.Write(emptyLine, Position.x, Position.y + y);
             }
+            redrawBorders = true;
         }
+
+
 
         void DrawMapRaw()
         {
@@ -277,13 +325,22 @@ namespace Kajaki
             {
                 Renderer.Write(midBorder[y % 2], Position.x, Position.y + y);
             }
+            redrawBorders = false;
+        }
+
+        void DrawWater()
+        {
+            for (int y = 0; y < contentSize.y; y++)
+            {
+                Renderer.Write(waterLine, contentPosition.x, contentPosition.y + y);
+            }
         }
 
         public Ship AddShip(int lenght, Int2 position)
         {
             Ship s = new Ship(lenght, position, this, DateTime.Now.Millisecond);
             Ships.Add(s);
-            GenerateCollisionsMap();
+            //GenerateCollisionsMap();
             return s;
         }
 
@@ -302,6 +359,7 @@ namespace Kajaki
             {
                 GenerateShipCollisions(Ships[i]);
             }
+            redrawCollision = true;
         }
 
         bool ResetDistanceAtPoint(int x, int y)
@@ -432,20 +490,45 @@ namespace Kajaki
 
         public bool MoveBy(Int2 delta)
         {
+            if (BoardState == OnBoardState.putDown)
+                return false;
+
             if (!Int2.InBox(MyMap.ContentSize - Int2.One, leftUpCorner + delta) || !Int2.InBox(MyMap.ContentSize - Int2.One, rightDownCorner + delta))
             {
                 return false;
             }
-
-
+            Int2[] prevPositions = new Int2[lenght];
             for(int i = 0; i < lenght; i++)
             {
+                prevPositions[i] = new Int2(Decks[i].Position.x, Decks[i].Position.y);
                 Decks[i].Position += delta;
             }
             leftUpCorner += delta;
             rightDownCorner += delta;
             UpdateCollisionState();
+            MyMap.UpdateTiles(prevPositions);
+            return true;
+        }
 
+        public bool RotateShip()
+        {
+            if (!Int2.InBox(MyMap.ContentSize - Int2.One, leftUpCorner + (rightDownCorner - leftUpCorner).Flipped()))
+                return false;
+
+            Int2[] prevPositions = new Int2[lenght - 1];
+            for (int i = 0; i < Decks.Length; i++)
+            {
+                if(i > 0)
+                {
+                    prevPositions[i-1] = new Int2(Decks[i].Position.x, Decks[i].Position.y);
+                }
+                Decks[i].Position = Decks[i].Position - leftUpCorner;
+                Decks[i].Position.Flip();
+                Decks[i].Position = Decks[i].Position + leftUpCorner;
+                rightDownCorner = Decks[lenght-1].Position;
+            }
+            UpdateCollisionState();
+            MyMap.UpdateTiles(prevPositions);
             return true;
         }
 
@@ -454,31 +537,17 @@ namespace Kajaki
             Collision = CollisionState.none;
             for (int i = 0; i < lenght; i++)
             {
-                if(MyMap.IsTileOccupied(Decks[i].Position, Id))
+                if (MyMap.IsTileOccupied(Decks[i].Position, Id))
                 {
                     Collision = CollisionState.overlap;
                     break;
                 }
-                if (MyMap.IsTileColliding(Decks[i].Position))
+                if (Collision != CollisionState.zone && MyMap.IsTileColliding(Decks[i].Position))
                 {
                     Collision = CollisionState.zone;
-                    break;
+
                 }
             }
-        }
-
-        public void RotateShip()
-        {
-            if (!Int2.InBox(MyMap.ContentSize - Int2.One, leftUpCorner + (rightDownCorner - leftUpCorner).Flipped()))
-                return;
-            for (int i = 0; i < Decks.Length; i++)
-            {
-                Decks[i].Position = Decks[i].Position - leftUpCorner;
-                Decks[i].Position.Flip();
-                Decks[i].Position = Decks[i].Position + leftUpCorner;
-                rightDownCorner = Decks[lenght-1].Position;
-            }
-            UpdateCollisionState();
         }
 
         public bool TryHit(Int2 position)

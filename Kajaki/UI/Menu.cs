@@ -86,14 +86,14 @@ namespace Kajaki
 
 
 
-        public void AddControll(MenuControll controll, Func<MenuEvent, bool> action)
+        public MenuControll AddControll(MenuControll controll, Func<MenuEvent, bool> action)
         {
             for (int i = 0; i < controlls.Count; i++)
             {
                 if (controlls[i].Identificator == controll.Identificator)
                 {
                     controlls[i] = controll;
-                    return;
+                    return controll;
                 }
             }
             controll.SetParent(this);
@@ -108,6 +108,7 @@ namespace Kajaki
             {
                 Size = new Int2(Size.x, controlls.Count + 2);
             }
+            return controll;
         }
 
         public void AddControll(MenuControll controll)

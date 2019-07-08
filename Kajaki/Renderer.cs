@@ -341,7 +341,6 @@ namespace Kajaki
         public void Age(int time)
         {
             lifeTime -= time;
-            Renderer.Write(lifeTime.ToString() + " " + time.ToString(),0, 25);
             if(lifeTime <= 0)
             {
                 Renderer.EraseTimedText(this);

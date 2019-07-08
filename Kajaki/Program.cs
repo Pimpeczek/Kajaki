@@ -18,7 +18,7 @@ namespace Kajaki
         static Logo l;
         static void Main(string[] args)
         {
-            Renderer.AsyncFrameLenght = 100;
+            Renderer.AsyncFrameLenght = 16;
             Renderer.WindowSize = new Int2(160, 50);
             Renderer.DebugMode = true;
             /*
@@ -168,6 +168,7 @@ namespace Kajaki
     {
         public static int[] ships { get; protected set; } = new int[8];
         public static int[] shipsOnBoard { get; protected set; } = new int[8];
+        static List<MenuControll> shipControlls;
         public static Map prepareMap { get; protected set; }
         public static int TurnTimer { get; protected set; }
         public static bool SetupGame(MenuEvent e)
@@ -348,9 +349,10 @@ namespace Kajaki
         {
 
             MenuControllEvent ce = (MenuControllEvent)e;
-            TextLine comm = new TextLine(new Int2(), "", true);
+            TextLine comm = new TextLine(new Int2(prepareMap.Position.x, prepareMap.Size.y + 1), " ", true);
+            comm.Size = new Int2(prepareMap.Size.x, 1);
+            comm.Alignment = Stringer.TextAlignment.Middle;
             string id = ce.Controll.Identificator;
-            Renderer.Write(id, 0, 20);
             id = id.Replace("len", "");
             int len;
             bool done = false;
@@ -363,64 +365,52 @@ namespace Kajaki
             s.UpdateCollisionState();
             Int2 cursorPosition = new Int2();
             bool wereColliding = false;
-            bool writeCommunicate = false;
-            string comunicate = "";
-            Int2 communicatePosition = new Int2();
+            bool doUpdate = true;
             ConsoleKey response;
             do
             {
-                prepareMap.GenerateCollisionsMap();
+                //prepareMap.GenerateCollisionsMap();
                 if (s.Collision == Ship.CollisionState.overlap)
                 {
                     wereColliding = true;
-                    writeCommunicate = true;
-                    comunicate = " SHIPS ARE OVERLAPPING! ";
-                    communicatePosition = new Int2(prepareMap.Position.x + prepareMap.Size.x - comunicate.Length / 2, prepareMap.Size.y + 1);
-                    comunicate = comunicate.Pastel(Color.Red);
+                    comm.SetText("SHIPS ARE OVERLAPPING!", Color.Red, Color.Black);
                 }
                 else if (s.Collision == Ship.CollisionState.zone)
                 {
                     wereColliding = true;
-                    writeCommunicate = true;
-                    comunicate = "SHIP IN COLLISION ZONE! ";
-                    communicatePosition = new Int2(prepareMap.Position.x + prepareMap.Size.x - comunicate.Length / 2, prepareMap.Size.y + 1);
-                    comunicate = comunicate.Pastel(Color.DarkRed);
+                    comm.SetText("SHIP IN COLLISION ZONE!", Color.DarkRed, Color.Black);
                 }
                 else
                 {
-                    if(wereColliding)
+                    if (wereColliding)
                     {
                         wereColliding = false;
-                        writeCommunicate = true;
-                        comunicate = "                        ";
-                        communicatePosition = new Int2(prepareMap.Position.x + prepareMap.Size.x - comunicate.Length / 2, prepareMap.Size.y + 1);
+                        comm.SetText("");
                     }
                 }
-                if (writeCommunicate)
+                if (doUpdate)
                 {
-                    Renderer.Write(comunicate, communicatePosition);
-                    writeCommunicate = false;
+                    prepareMap.Draw();
                 }
-                prepareMap.Draw();
                 response = Console.ReadKey(true).Key;
 
                 switch (response)
                 {
                     case ConsoleKey.A:
                     case ConsoleKey.LeftArrow:
-                        s.MoveBy(Int2.Left);
+                        doUpdate = s.MoveBy(Int2.Left);
                         break;
                     case ConsoleKey.W:
                     case ConsoleKey.UpArrow:
-                        s.MoveBy(Int2.Down);
+                        doUpdate = s.MoveBy(Int2.Down);
                         break;
                     case ConsoleKey.D:
                     case ConsoleKey.RightArrow:
-                        s.MoveBy(Int2.Right);
+                        doUpdate = s.MoveBy(Int2.Right);
                         break;
                     case ConsoleKey.S:
                     case ConsoleKey.DownArrow:
-                        s.MoveBy(Int2.Up);
+                        doUpdate = s.MoveBy(Int2.Up);
                         break;
                     case ConsoleKey.Enter:
                         done = true;
@@ -429,10 +419,10 @@ namespace Kajaki
                         done = true;
                         s.Delete();
                         s = null;
+                        doUpdate = true;
                         break;
                     case ConsoleKey.R:
-                        s.RotateShip();
-                        prepareMap.Draw();
+                        doUpdate = s.RotateShip();
                         break;
                 }
                 
@@ -443,11 +433,15 @@ namespace Kajaki
                 
 
             } while (!done);
-            if(s != null)
+            if (s != null)
+            {
                 s.PutDown();
+                shipsOnBoard[s.lenght - 1]++;
+                Renderer.AddDissapearingText("Added a new ship", 1000, new Int2(prepareMap.Position.x + prepareMap.Size.x - 8, 0));
+            }
             prepareMap.GenerateCollisionsMap();
             prepareMap.Draw();
-            Renderer.AddDissapearingText("Added new ship", 1000, new Int2(40, 0));
+            
             return save;
         }
 
@@ -455,7 +449,7 @@ namespace Kajaki
         {
             EraseShips();
             e.Menu.Erase();
-            
+            shipControlls = new List<MenuControll>();
             prepareMap.Erase();
 
             Menu boardMenu = new Menu(new Int2(1, 1), new Int2(32, 45), "Board Setup", Boxes.BoxType.doubled)
@@ -467,8 +461,11 @@ namespace Kajaki
             boardMenu.AddControll(new LabelControll("- Select ship -", "ship_label"));
             for (int i = 0; i < ships.Length; i++)
             {
-                if(ships[i] > 0)
-                boardMenu.AddControll(new MenuControll($"Lenght {i+1} - {shipsOnBoard[i]}/{ships[i]} on board", $"len{i+1}"), PutDownShip);
+                if (ships[i] > 0)
+                {
+
+                    shipControlls.Add(boardMenu.AddControll(new MenuControll($"Lenght {i + 1} - {shipsOnBoard[i]}/{ships[i]} on board", $"len{i + 1}"), PutDownShip));
+                }
             }
 
             boardMenu.AddControll(new LineSeparatorControll("sep4", "sep4"));
@@ -490,19 +487,6 @@ namespace Kajaki
         }
     }
 
-    class ShipSetup
-    {
-        public static Map PrepareMap { get; set; }
-
-    }
-    
-
-
-    
-
-
-    
-
 
     class TextLine
     {
@@ -517,8 +501,9 @@ namespace Kajaki
             {
                 if (alignment == value)
                     return;
+                Hide();
                 alignment = value;
-                Refresh();
+                Show();
             }
         }
         Int2 position;
@@ -535,7 +520,26 @@ namespace Kajaki
                 Show();
             }
         }
-        public Int2 Size { get; protected set; }
+        Int2 size;
+        public Int2 Size
+        {
+            get
+            {
+                return size;
+            }
+            set
+            {
+                if (value == size)
+                    return;
+                if (alignment == Stringer.TextAlignment.Wrapp)
+                    return;
+                Hide();
+                size = value;
+                Show();
+            }
+        }
+
+
         protected Color backgroundColor;
         protected Color textColor;
 
@@ -549,7 +553,8 @@ namespace Kajaki
         {
             this.position = position;
             previousText = "";
-            IsVIsable = false;
+            IsVIsable = visable;
+            emptyLine = "";
             UpdateText(text);
         }
 
@@ -588,15 +593,15 @@ namespace Kajaki
 
         public void Show()
         {
-            IsVIsable = false;
+            IsVIsable = true;
             Refresh();
         }
 
         void Refresh()
         {//Problemy z kolorami w alignmencie, bo pastel itd... zrobić align lokalny albo w stringerze z pastelem
-            if (IsVIsable)
+            if (IsVIsable && Text.Length > 0)
             {
-                //Renderer.Write(Stringer.AlighnString(Text).Pastel(textColor).PastelBg(backgroundColor), position);
+                Renderer.Write(Stringer.AlighnString(Text, size.x, alignment).Replace(Text, Text.Pastel(textColor).PastelBg(backgroundColor)), position);
             }
         }
 
